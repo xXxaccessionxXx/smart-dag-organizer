@@ -1,0 +1,21 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# IDEs
+.vscode/
+.idea/
+
+# Local Config & Data
+config.json
+data/genesis_data.json
+test_config.json
+test_config_expanded.json
+tests/test_data/

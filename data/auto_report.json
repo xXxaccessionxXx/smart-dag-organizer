@@ -1,0 +1,352 @@
+[
+  {
+    "file": ".\\ai_brain.py",
+    "line": 400,
+    "content": "body += \"                    if 'TODO' in line:\\n\""
+  },
+  {
+    "file": ".\\ai_brain.py",
+    "line": 538,
+    "content": "\"find_todos_json\": \"find TODO comments and save to json report\","
+  },
+  {
+    "file": ".\\ai_brain.py",
+    "line": 573,
+    "content": "(\"find_todos\", \"find TODO comments in project\"),"
+  },
+  {
+    "file": ".\\ai_brain.py",
+    "line": 627,
+    "content": "targets = [\"TODO\", \"functions\", \"classes\"]"
+  },
+  {
+    "file": ".\\ai_brain.py",
+    "line": 665,
+    "content": "if \"TODO\" in output: score += 50 # Found something useful"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 20,
+    "content": "# Description: find TODO comments and save to json report"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 29,
+    "content": "print(f'Task: find TODO comments and save to json report')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 31,
+    "content": "print('Scanning project for TODOs...')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 39,
+    "content": "if 'TODO' in line:"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 48,
+    "content": "# Description: find TODO comments and save to json report"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 57,
+    "content": "print(f'Task: find TODO comments and save to json report')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 59,
+    "content": "print('Scanning project for TODOs (JSON Mode)...')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 68,
+    "content": "if 'TODO' in line:"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 80,
+    "content": "# Description: find TODO comments in project"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 88,
+    "content": "print(f'Task: find TODO comments in project')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 90,
+    "content": "print('Scanning project for TODOs...')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 98,
+    "content": "if 'TODO' in line:"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 107,
+    "content": "# Description: find TODO comments in project"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 115,
+    "content": "print(f'Task: find TODO comments in project')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 117,
+    "content": "print('Scanning project for TODOs...')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 125,
+    "content": "if 'TODO' in line:"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 134,
+    "content": "# Description: find TODO comments and save to json report"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 143,
+    "content": "print(f'Task: find TODO comments and save to json report')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 145,
+    "content": "print('Scanning project for TODOs (JSON Mode)...')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 154,
+    "content": "if 'TODO' in line:"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 222,
+    "content": "# Description: find TODO comments in project"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 230,
+    "content": "print(f'Task: find TODO comments in project')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 232,
+    "content": "print('Scanning project for TODOs...')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 240,
+    "content": "if 'TODO' in line:"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 276,
+    "content": "# Tool: auto_procedural_find_TODO_59_1770331431"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 277,
+    "content": "# Description: find TODO in project and save to json"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 288,
+    "content": "print(f'Task: find TODO in project and save to json')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 302,
+    "content": "if 'TODO' in line:"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 322,
+    "content": "# Tool: auto_procedural_count_TODO_55_1770331482"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 323,
+    "content": "# Description: count TODO in project and report"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 332,
+    "content": "print(f'Task: count TODO in project and report')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 346,
+    "content": "if 'TODO' in line:"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 404,
+    "content": "# Tool: auto_procedural_find_TODO_80_1770331517"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 405,
+    "content": "# Description: find TODO in project and report"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 415,
+    "content": "print(f'Task: find TODO in project and report')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 429,
+    "content": "if 'TODO' in line:"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 487,
+    "content": "# Tool: auto_procedural_count_TODO_48_1770331573"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 488,
+    "content": "# Description: count TODO in project and save to json"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 498,
+    "content": "print(f'Task: count TODO in project and save to json')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 512,
+    "content": "if 'TODO' in line:"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 579,
+    "content": "# Tool: auto_procedural_analyze_TODO_97_1770332200"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 580,
+    "content": "# Description: analyze TODO in project and report"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 590,
+    "content": "print(f'Task: analyze TODO in project and report')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 604,
+    "content": "if 'TODO' in line:"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 615,
+    "content": "# Tool: auto_procedural_find_TODO_6_1770332210"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 616,
+    "content": "# Description: find TODO recursively and save to json"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 627,
+    "content": "print(f'Task: find TODO recursively and save to json')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 641,
+    "content": "if 'TODO' in line:"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 708,
+    "content": "# Tool: auto_procedural_count_TODO_36_1770332255"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 709,
+    "content": "# Description: count TODO recursively and report"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 718,
+    "content": "print(f'Task: count TODO recursively and report')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 732,
+    "content": "if 'TODO' in line:"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 743,
+    "content": "# Tool: auto_procedural_find_TODO_99_1770332296"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 744,
+    "content": "# Description: find TODO in project and save to json"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 755,
+    "content": "print(f'Task: find TODO in project and save to json')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 769,
+    "content": "if 'TODO' in line:"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 789,
+    "content": "# Tool: auto_procedural_find_TODO_1770332930"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 790,
+    "content": "# Description: find TODO in project and report"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 800,
+    "content": "print(f'Task: find TODO in project and report')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 814,
+    "content": "if 'TODO' in line:"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 825,
+    "content": "# Tool: auto_procedural_count_TODO_1770332940"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 826,
+    "content": "# Description: count TODO in project and report"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 835,
+    "content": "print(f'Task: count TODO in project and report')"
+  },
+  {
+    "file": ".\\ai_extensions.py",
+    "line": 849,
+    "content": "if 'TODO' in line:"
+  },
+  {
+    "file": ".\\verify_ml.py",
+    "line": 55,
+    "content": "bad_key = \"procedural_find_TODO\""
+  }
+]

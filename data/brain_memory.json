@@ -1,0 +1,123 @@
+{
+    "qa": [
+        {
+            "q": "hello hi greetings hey",
+            "a": "Greetings. System is online and listening."
+        },
+        {
+            "q": "who are you",
+            "a": "I am the Neural Assistant, your digital companion."
+        },
+        {
+            "q": "what can you do help",
+            "a": "I can assist with workflows, manage scripts, and chat. Type '/learn Q : A' to teach me."
+        },
+        {
+            "q": "what is genesis",
+            "a": "Project Genesis is the ecosystem we are building together."
+        },
+        {
+            "q": "bye goodbye exit",
+            "a": "Session termination acknowledged. Goodbye."
+        },
+        {
+            "q": "thanks thank you",
+            "a": "You are welcome. Efficiency is my goal."
+        },
+        {
+            "q": "status report",
+            "a": "All systems nominal. Logic engine active."
+        }
+    ],
+    "facts": [
+        "Remove the end of line feature",
+        "You are talking to Kasey",
+        "My favorite color is orange",
+        "Yes, I asked how you are",
+        "That's good, I am glad.",
+        "[BIBLE_VEC] In the beginning God created the heaven and the ea..."
+    ],
+    "opinions": [],
+    "files": [
+        "brain_memory.json",
+        "main.py",
+        "requirements.txt",
+        "TEACHING_GUIDE.md",
+        "test_gen.txt",
+        "verify_meta_output.txt",
+        "verify_output.txt"
+    ],
+    "skills": [
+        "find_todos",
+        "find_todos_v2",
+        "find_todos_json",
+        "map_directory",
+        "map_directory_depth",
+        "analyze_code",
+        "analyze_code_complexity",
+        "map_directory_v2",
+        "sort_numbers",
+        "analyze_code_v2",
+        "procedural_count_classes_10",
+        "procedural_find_TODO_59",
+        "count_lines",
+        "procedural_analyze_functions_96",
+        "procedural_analyze_classes_68",
+        "procedural_count_TODO_55",
+        "procedural_find_classes_50",
+        "procedural_analyze_classes_75",
+        "procedural_find_TODO_80",
+        "procedural_find_classes_19",
+        "procedural_analyze_functions_3",
+        "procedural_find_functions_51",
+        "procedural_count_TODO_48",
+        "procedural_find_classes_62",
+        "procedural_count_classes_59",
+        "procedural_analyze_functions_42",
+        "procedural_find_classes_26",
+        "procedural_analyze_TODO_97",
+        "procedural_find_TODO_6",
+        "research_basics",
+        "procedural_analyze_classes_26",
+        "procedural_count_TODO_36",
+        "procedural_count_classes_28",
+        "procedural_find_TODO_99",
+        "procedural_find_TODO",
+        "procedural_count_TODO",
+        "procedural_analyze_classes",
+        "procedural_analyze_TODO"
+    ],
+    "failed_tasks": {
+        "procedural_find_classes_20": 1,
+        "procedural_count_functions_2": 1,
+        "research_bible": 31,
+        "calc_primes": 3,
+        "check_imports": 1,
+        "procedural_find_classes": 1
+    },
+    "networks": {
+        "meta_classifier": {
+            "W1": [
+                0.2410485352534908,
+                -0.3818354401196258,
+                -0.8497902347323611,
+                0.89330124635284,
+                0.10010841686300864,
+                -0.8947144162733944,
+                -0.5673811799108004,
+                -0.3712393301316479,
+                0.9926256914962244,
+                -0.6607442237995846,
+                -0.024465958977832214,
+                -0.7070426680427992
+            ],
+            "W2": [
+                -0.4869361256982139,
+                -0.4933200144982208,
+                0.4407430239790273,
+                -0.3812012185557705
+            ],
+            "hidden_size": 4
+        }
+    }
+}
