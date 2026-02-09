@@ -1358,7 +1358,6 @@ class SmartWorkflowOrganizer(QMainWindow):
              self.config_manager.set_window_geometry(self.saveGeometry().toHex().data().decode())
 
         try:
-        try:
             from launcher import GenesisLauncher
             self.launcher = GenesisLauncher()
             self.launcher.show()
