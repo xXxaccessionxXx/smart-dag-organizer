@@ -14,6 +14,16 @@ def create_installer():
     print("   Smart DAG Organizer - Installer Builder")
     print("="*60)
 
+    # 0. Sync with Remote
+    print("\n[0/5] Syncing with Remote...")
+    try:
+        run_command("git pull origin master")
+    except Exception as e:
+        print(f"[Error] Git pull failed: {e}")
+        response = input("Continue anyway? (y/N): ").strip().lower()
+        if response != 'y':
+            sys.exit(1)
+
     # 1. Build Main Application
     print("\n[1/4] Building Main Application...")
     if os.path.exists("dist"):
@@ -145,7 +155,26 @@ def create_installer():
             print("Pushing to GitHub...")
             run_command("git add .")
             run_command(f'git commit -m "{commit_msg}"')
-            run_command("git push origin master")
+            
+            # Robust Push Logic
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    print(f"Push attempt {attempt+1}/{max_retries}...")
+                    run_command("git push origin master")
+                    break # Success!
+                except subprocess.CalledProcessError:
+                    print("\n[Warning] Push failed. Remote might have new changes.")
+                    if attempt < max_retries - 1:
+                        print("Attempting to pull and rebase...")
+                        try:
+                            run_command("git pull --rebase origin master")
+                        except Exception as e:
+                             print(f"[Error] Rebase failed: {e}. Please resolve conflicts manually.")
+                             sys.exit(1)
+                    else:
+                        print("\n[Error] Failed to push after multiple attempts.")
+                        sys.exit(1)
             
             # Push Tag to trigger GitHub Action
             tag_name = f"v{new_ver}"
