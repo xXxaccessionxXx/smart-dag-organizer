@@ -143,10 +143,19 @@ class SettingsDialog(QDialog):
         self.chk_gradient = QCheckBox("Enable UI Gradients")
         self.chk_gradient.setChecked(self.config_manager.is_gradient_enabled())
         self.chk_gradient.stateChanged.connect(self.trigger_live_update)
+        
+        # Console Toggle
+        self.chk_console = QCheckBox("Show Debug Console (Requires Restart)")
+        # We need to manually get/set this since it's not a standard appearance setting?
+        # Let's assume ConfigManager handles it via generic get/set
+        is_console = self.config_manager.get("show_console")
+        if is_console is None: is_console = False
+        self.chk_console.setChecked(bool(is_console))
 
         form_layout.addRow(lbl_theme, self.combo_theme)
         form_layout.addRow(lbl_grid, self.combo_grid)
         form_layout.addRow("", self.chk_gradient)
+        form_layout.addRow("", self.chk_console)
 
         layout.addLayout(form_layout)
         layout.addStretch()
