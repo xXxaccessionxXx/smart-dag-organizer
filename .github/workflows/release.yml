@@ -33,11 +33,9 @@ jobs:
         )
       shell: cmd
 
-    - name: Build Installer
-      # We use the existing script but skip the interactive parts if possible
-      # Or just run the commands directly to be safe
+    - name: Build Installer (and Main App)
       run: |
-        pyinstaller --noconfirm --onefile --windowed --name "SmartDAG_Setup" --add-data "src;src" --add-data "assets;assets" --icon "assets/icon.bmp" "src/setup_wizard.py"
+        python create_installer.py --build-only
 
     - name: Create Portable Zip
       run: |
@@ -47,7 +45,7 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          dist/SmartDAG_Setup.exe
+          SmartDAG_Setup.exe
           SmartDAG_Portable.zip
         generate_release_notes: true
         draft: false

@@ -65,9 +65,12 @@ def create_installer():
     setup_cmd = (
         f'pyinstaller --noconfirm --onefile --windowed --name "SmartDAG_Setup" '
         f'--add-data "{payload_zip};." '
-        # f'--icon "assets/icon.bmp" ' # Icon disabled due to environment issues
-        f'"src/setup_wizard.py"'
     )
+    
+    if os.path.exists("assets/icon.bmp"):
+        setup_cmd += f' --icon "assets/icon.bmp" '
+        
+    setup_cmd += f'"src/setup_wizard.py"'
     
     # We might need to temporarily copy setup_wizard to root to avoid path issues with imports?
     # Actually, setup_wizard imports PyQt6, which is installed.
@@ -91,6 +94,10 @@ def create_installer():
         print("\n[Error] Setup executable not found in dist/")
 
     # 5. Git & Release Automation
+    if "--build-only" in sys.argv:
+        print("\n[Info] Build Only mode: Skipping release automation.")
+        return
+
     print("\n[5/5] Release Automation")
     do_release = input("Do you want to push this release to GitHub? (y/N): ").strip().lower()
     
