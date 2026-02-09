@@ -18,13 +18,19 @@ def show_error_and_exit(missing_module):
 try:
     from PyQt6.QtWidgets import (QApplication, QMainWindow, QGraphicsView, 
                                  QGraphicsScene, QVBoxLayout, QHBoxLayout, QWidget, QLabel, 
-                                 QGraphicsRectItem, QGraphicsItem, QGraphicsTextItem, 
-                                 QPushButton, QGraphicsLineItem, QMenu, QFileDialog, 
-                                 QInputDialog, QComboBox, QMessageBox, QGraphicsProxyWidget,
-                                 QFrame, QTextEdit, QGraphicsDropShadowEffect, QLineEdit) # Added items
+                                 QPushButton, QGraphicsItem, QGraphicsRectItem, 
+                                 QGraphicsTextItem, QGraphicsLineItem, QGraphicsProxyWidget,
+                                 QFrame, QTextEdit, QLineEdit, QComboBox, QMessageBox, 
+                                 QFileDialog, QInputDialog, QGraphicsDropShadowEffect, QMenu, QStyle) # Added items
     from PyQt6.QtGui import (QColor, QFont, QPen, QBrush, QAction, QDesktopServices, 
-                             QPainter, QCursor, QTransform, QLinearGradient, QPainterPath)
-    from PyQt6.QtCore import Qt, QTimer, QLineF, QUrl, QPointF, QRectF, QSizeF
+                             QPainter, QCursor, QTransform, QLinearGradient, QPainterPath, QIcon)
+    from PyQt6.QtCore import (Qt, QTimer, QLineF, QUrl, QPointF, QRectF, QSizeF, 
+                              QVariantAnimation, QEasingCurve, QPropertyAnimation, pyqtSignal)
+    try:
+        from src.utils.assets import resource_path
+    except ImportError:
+        # Fallback if utils not found (e.g. running from scratch without package context)
+        def resource_path(p): return p
 except ImportError:
     show_error_and_exit("PyQt6")
 
@@ -38,6 +44,7 @@ class SmartView(QGraphicsView):
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         
+        # NAVIGATION STATE
         self._is_panning = False
         self._pan_start = QPointF(0, 0)
         
@@ -50,26 +57,67 @@ class SmartView(QGraphicsView):
         self.setBackgroundBrush(self.grid_color_dark)
 
     def drawBackground(self, painter, rect):
-        super().drawBackground(painter, rect)
+        # 1. Draw Gradient Background (Fixed to Viewport)
+        theme_data = self.main_window.theme_data
+        bg_color = QColor(theme_data["window_bg"])
         
+        # Save painter state to switch to viewport coordinates
+        painter.save()
+        painter.resetTransform() # Switch to window coordinates
+        
+        viewport_rect = self.viewport().rect()
+        
+        if hasattr(self.main_window.config_manager, "is_gradient_enabled") and self.main_window.config_manager.is_gradient_enabled():
+             # Convert to QPointF for Gradient constructor
+             gradient = QLinearGradient(QPointF(viewport_rect.topLeft()), QPointF(viewport_rect.bottomRight()))
+             gradient.setColorAt(0, bg_color)
+             
+             # End color
+             end_color = QColor(bg_color)
+             if end_color.lightness() > 128:
+                  end_color = end_color.darker(115) 
+             else:
+                  end_color = end_color.lighter(115) 
+                  
+             gradient.setColorAt(1, end_color)
+             painter.fillRect(viewport_rect, QBrush(gradient))
+        else:
+             painter.fillRect(viewport_rect, QBrush(bg_color))
+        
+        painter.restore() # Restore scene coordinates for grid
+        
+        # 2. Draw Grid (Scene Coordinates)
+        grid_style = self.main_window.config_manager.get_grid_style()
+        grid_color = QColor(theme_data["grid_light"])
+        grid_color.setAlpha(40) 
+
         grid_size = 50
         left = int(rect.left()) - (int(rect.left()) % grid_size)
         top = int(rect.top()) - (int(rect.top()) % grid_size)
-        
-        lines = []
         right = int(rect.right())
         bottom = int(rect.bottom())
-        
-        for x in range(left, right, grid_size):
-            lines.append(QLineF(x, rect.top(), x, rect.bottom()))
-        
-        for y in range(top, bottom, grid_size):
-            lines.append(QLineF(rect.left(), y, rect.right(), y))
 
-        pen = QPen(self.grid_color_light)
-        pen.setWidth(1)
-        painter.setPen(pen)
-        painter.drawLines(lines)
+        if grid_style == "Dots":
+            pen = QPen(grid_color)
+            pen.setWidth(2)
+            painter.setPen(pen)
+            
+            for x in range(left, right, grid_size):
+                for y in range(top, bottom, grid_size):
+                     painter.drawPoint(x, y)
+        else:
+            # Default Lines
+            lines = []
+            for x in range(left, right, grid_size):
+                lines.append(QLineF(x, rect.top(), x, rect.bottom()))
+            
+            for y in range(top, bottom, grid_size):
+                lines.append(QLineF(rect.left(), y, rect.right(), y))
+
+            pen = QPen(grid_color)
+            pen.setWidth(1)
+            painter.setPen(pen)
+            painter.drawLines(lines)
 
     def keyPressEvent(self, event):
         # Check if a text widget has focus
@@ -85,6 +133,8 @@ class SmartView(QGraphicsView):
 
         if event.key() == Qt.Key.Key_Space:
             self.main_window.focus_camera_on_nodes()
+        elif event.key() == Qt.Key.Key_Delete:
+            self.main_window.delete_selected_items()
         else:
             super().keyPressEvent(event)
 
@@ -107,13 +157,35 @@ class SmartView(QGraphicsView):
             super().wheelEvent(event)
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.MiddleButton:
+        # LEFT CLICK -> PAN (ScrollHandDrag)
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Check if we clicked on an item (node) -> If so, let it handle selection/move
+            if self.scene().itemAt(self.mapToScene(event.pos()), QTransform()):
+                super().mousePressEvent(event)
+                return
+            
+            # If on empty space, start panning
             self._is_panning = True
             self._pan_start = event.position()
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
             event.accept()
-        else:
+
+        # RIGHT CLICK -> SELECT (RubberBandDrag)
+        elif event.button() == Qt.MouseButton.RightButton:
+            # Check if we clicked on an item -> If so, Context Menu (handled by item)
+            item = self.scene().itemAt(self.mapToScene(event.pos()), QTransform())
+            if item:
+                # Pass to item for context menu
+                super().mousePressEvent(event)
+                return
+            
+            # If on empty space, ensure DragMode is RubberBand
+            if self.dragMode() != QGraphicsView.DragMode.RubberBandDrag:
+                self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
             super().mousePressEvent(event)
+        
+        else:
+             super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
         if self._is_panning:
@@ -127,27 +199,76 @@ class SmartView(QGraphicsView):
             super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        if event.button() == Qt.MouseButton.MiddleButton:
-            self._is_panning = False
-            self.setCursor(Qt.CursorShape.ArrowCursor)
-            event.accept()
+        if event.button() == Qt.MouseButton.LeftButton:
+            if self._is_panning:
+                self._is_panning = False
+                self.setCursor(Qt.CursorShape.ArrowCursor)
+                event.accept()
+            else:
+                super().mouseReleaseEvent(event)
+        elif event.button() == Qt.MouseButton.RightButton:
+             super().mouseReleaseEvent(event)
         else:
             super().mouseReleaseEvent(event)
-
 # --- 2. The Connection Line Class ---
-class ConnectionLine(QGraphicsLineItem):
-    def __init__(self, start_node, end_node):
+class SmartLine(QGraphicsLineItem):
+    def __init__(self, start_node, end_node, main_window=None):
         super().__init__()
         self.start_node = start_node
         self.end_node = end_node
+        self.main_window = main_window
         
-        pen = QPen(QColor("#666666"))
-        pen.setWidth(2)
-        pen.setStyle(Qt.PenStyle.DashLine) 
-        self.setPen(pen)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
+        
+        self.pen_default = QPen(QColor("#666666"))
+        self.pen_default.setWidth(2)
+        self.pen_default.setStyle(Qt.PenStyle.DashLine) 
+        
+        self.pen_selected = QPen(QColor("#007acc"))
+        self.pen_selected.setWidth(3)
+        self.pen_selected.setStyle(Qt.PenStyle.SolidLine)
+        
+        self.setPen(self.pen_default)
         self.setZValue(-1) 
         
+        self.drawing_progress = 1.0 # 0.0 to 1.0
+        
         self.update_position()
+        
+    def set_drawing_progress(self, value):
+        self.drawing_progress = value
+        self.update()
+
+    def paint(self, painter, option, widget=None):
+        if self.isSelected():
+            painter.setPen(self.pen_selected)
+        else:
+            painter.setPen(self.pen_default)
+            
+        line = self.line()
+        if self.drawing_progress < 1.0:
+            p1 = line.p1()
+            p2 = line.p2()
+            # Vector math to find intermediate point
+            # QPointF - QPointF = QPointF (vector)
+            vec = p2 - p1
+            new_p2 = p1 + (vec * self.drawing_progress)
+            line = QLineF(p1, new_p2)
+            
+        painter.drawLine(line)
+
+    def contextMenuEvent(self, event):
+        menu = QMenu()
+        action_del = menu.addAction("❌ Delete Connection")
+        action_del.triggered.connect(self.delete_line)
+        menu.exec(event.screenPos())
+        
+    def delete_line(self):
+        if self.main_window:
+            self.main_window.remove_line(self)
+        elif self.scene():
+             self.scene().removeItem(self)
+
 
     def update_position(self):
         if not self.start_node.scene() or not self.end_node.scene():
@@ -164,6 +285,8 @@ class ConnectionLine(QGraphicsLineItem):
 
 # --- 3a. Note Popup Class ---
 class NotePopup(QGraphicsProxyWidget):
+    hoverLeave = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setZValue(1000) 
@@ -298,6 +421,14 @@ class NotePopup(QGraphicsProxyWidget):
         if self.parentItem():
              self.parentItem().start_hide_timer()
         super().hoverLeaveEvent(event)
+        self.hoverLeave.emit()
+
+# --- 3b. Modern Text Item (No Dashed Outline) ---
+class ModernTextItem(QGraphicsTextItem):
+    def paint(self, painter, option, widget=None):
+        # Remove the dashed focus border
+        option.state &= ~QStyle.StateFlag.State_HasFocus
+        super().paint(painter, option, widget)
 
 # --- 3. The Smart Node Class ---
 class SmartNode(QGraphicsRectItem):
@@ -325,44 +456,74 @@ class SmartNode(QGraphicsRectItem):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
 
+        # Drop Shadow for Depth
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(20)
+        shadow.setColor(QColor(0, 0, 0, 80))
+        shadow.setOffset(4, 4)
+        self.setGraphicsEffect(shadow)
+
+        # Theme Colors
+        theme = self.main_window.theme_data
+        
         # Default Pens
         self.pen_default = QPen(Qt.PenStyle.NoPen)
-        # Gold Pen for Start Node
+        # Start Node Pen
         self.pen_start = QPen(QColor("#FFD700")) 
         self.pen_start.setWidth(3)
 
-        self.brush_pending = QBrush(QColor("#3e3e42")) 
-        self.brush_done = QBrush(QColor("#2da44e"))   
-        self.brush_link = QBrush(QColor("#007acc"))   
-        self.brush_disabled = QBrush(QColor("#252526")) 
+        self.brush_pending = QBrush(QColor(theme["node_bg"])) 
+        self.brush_done = QBrush(QColor("#2da44e")) # Keep semantic green for Done? Or theme? theme["accent_color"]? Green is standard for "Success".
+        self.brush_link = QBrush(QColor(theme["accent_color"]))   
+        self.brush_disabled = QBrush(QColor(theme["window_bg"])) 
         
         self.setBrush(self.brush_pending)
         self.setPen(self.pen_default)
 
+        self.setPen(self.pen_default)
+
         # Title
-        self.text_item = QGraphicsTextItem(name, self)
+        self.text_item = ModernTextItem(name, self)
         self.set_text_style(completed=False)
-        self.text_item.setPos(10, 15)
+        self.text_item.setPos(10, 2) # Centered vertically in 30px header
         self.text_item.setTextInteractionFlags(Qt.TextInteractionFlag.TextEditorInteraction)
         self.text_item.document().contentsChanged.connect(self.update_name_from_text)
 
         # Type Indicator
         self.type_item = QGraphicsTextItem("", self)
-        self.type_item.setDefaultTextColor(QColor("#aaaaaa"))
+        self.type_item.setDefaultTextColor(QColor(theme["text_dim"]))
         self.type_item.setFont(QFont("Segoe UI", 8))
         self.type_item.setPos(10, 45)
 
         # Note Indicator
         self.note_item = QGraphicsTextItem("📝", self)
         self.note_item.setDefaultTextColor(QColor("#ffd700"))
-        self.note_item.setPos(165, 5) # Shifted slightly left
+        self.note_item.setPos(165, 5) 
         self.note_item.setVisible(False)
+        
+        # Pop In Animation
+        self.setTransformOriginPoint(100, 40) # Center of 200x80 node
+        self.setScale(0.1)
+        
+        self.pop_anim = QVariantAnimation()
+        self.pop_anim.setDuration(500)
+        self.pop_anim.setStartValue(0.1)
+        self.pop_anim.setEndValue(1.0)
+        self.pop_anim.setEasingCurve(QEasingCurve.Type.OutBack)
+        self.pop_anim.valueChanged.connect(self.setScale)
+        self.pop_anim.start()
 
         # Collapse Button
-        self.collapse_btn = QGraphicsTextItem("[-]", self)
-        self.collapse_btn.setDefaultTextColor(QColor("#00aaff"))
-        self.collapse_btn.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
-        self.collapse_btn.setPos(180, 2)
+        self.collapse_btn = QGraphicsTextItem("−", self)
+        # Use theme color if available, else standard
+        btn_color = theme["text_dim"] if "text_dim" in theme else "#cccccc"
+        self.collapse_btn.setDefaultTextColor(QColor(btn_color))
+        self.collapse_btn.setFont(QFont("Arial", 14))
+        self.collapse_btn.setFont(QFont("Arial", 14))
+        
+        # Initial sizing
+        # Initial sizing
+        self.adjust_size()
         
         # Hover Support
         self.setAcceptHoverEvents(True)
@@ -372,14 +533,140 @@ class SmartNode(QGraphicsRectItem):
         self.hide_timer = QTimer()
         self.hide_timer.setSingleShot(True)
         self.hide_timer.timeout.connect(lambda: self.popup.setVisible(False))
+        
+    def itemChange(self, change, value):
+        if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():
+            # 1. Hide popup on drag
+            if self.popup.isVisible():
+                self.popup.setVisible(False)
+            
+            # 2. Magnetic Snapping
+            new_pos = value
+            x, y = new_pos.x(), new_pos.y()
+            
+            # Snap thresholds
+            SNAP_DIST = 20
+            snap_x, snap_y = x, y
+            
+            # Only snap if moving by mouse (optimization?) - strict check might be complex, verify simply first.
+            if self.isSelected():
+                for item in self.scene().items():
+                    if item == self or not isinstance(item, SmartNode):
+                        continue
+                    
+                    # Get other node pos
+                    ox, oy = item.pos().x(), item.pos().y()
+                    
+                    # Snap X (Align Left)
+                    if abs(x - ox) < SNAP_DIST:
+                        snap_x = ox
+                        
+                    # Snap Y (Align Top)
+                    if abs(y - oy) < SNAP_DIST:
+                        snap_y = oy
+            
+            return QPointF(snap_x, snap_y)
+            
+        return super().itemChange(change, value)
+
+    def adjust_size(self):
+        # Calculate required width based on title
+        text_width = self.text_item.boundingRect().width()
+        new_width = max(200, text_width + 45) # 200 min width, 45 padding for buttons
+        
+        # Update Node Rect (Keep height 80)
+        self.setRect(0, 0, new_width, 80)
+        
+        # Reposition Elements
+        self.collapse_btn.setPos(new_width - 25, -2)
+        self.note_item.setPos(new_width - 35, 5)
+        
+        # Update Pivot (Center)
+        self.setTransformOriginPoint(new_width / 2, 40)
+
+        # Update Pivot (Center)
+        self.setTransformOriginPoint(new_width / 2, 40)
+
+    def paint(self, painter, option, widget=None):
+        # Custom Painting for Modern Look
+        path = QPainterPath()
+        path.addRoundedRect(self.rect(), 10, 10)
+        
+        # Shadow / Glow
+        if self.isSelected():
+            painter.setPen(QPen(QColor("#007acc"), 3))
+        else:
+            painter.setPen(self.pen_default)
+            
+        # Background
+        painter.fillPath(path, self.brush())
+        
+        # Header Strip
+        # Draw a translucent overlay for the header area
+        header_height = 30
+        # Header Strip
+        # Draw a translucent overlay for the header area
+        header_height = 30
+        header_rect = QRectF(0, 0, self.rect().width(), header_height)
+        header_brush = QBrush(QColor(0, 0, 0, 40)) # 40/255 opacity black
+        
+        painter.save()
+        painter.setClipPath(path) # Clip to rounded node shape
+        painter.fillRect(header_rect, header_brush)
+        
+        # Draw status stripe if start node
+        if self.is_start_node:
+            painter.fillRect(QRectF(0, 0, 5, self.rect().height()), QColor("#FFD700"))
+            
+        painter.restore()
+        
+        # Draw Border
+        painter.drawPath(path)
 
     def hoverEnterEvent(self, event):
         self.stop_hide_timer()
         # Update Popup Data
         self.popup.update_content(self.name, self.attachment_type, self.watch_path, self.notes)
         
-        # Position Popup 
-        self.popup.setPos(self.rect().width() + 10, 0)
+        # Smart Positioning (Avoid Overlap)
+        margin = 10
+        node_w = self.rect().width()
+        node_h = self.rect().height()
+        pop_w = self.popup.boundingRect().width()
+        pop_h = self.popup.boundingRect().height()
+        
+        # Candidate positions (local coords relative to Node)
+        # 1. Right, 2. Left, 3. Bottom, 4. Top
+        candidates = [
+            QPointF(node_w + margin, 0),                  # Right
+            QPointF(-pop_w - margin, 0),                 # Left
+            QPointF(0, node_h + margin),                 # Bottom
+            QPointF(0, -pop_h - margin)                  # Top
+        ]
+        
+        best_pos = candidates[0] # Default to Right
+        
+        if self.scene():
+            for pos in candidates:
+                # Create a test rect in local coords
+                test_rect = QRectF(pos.x(), pos.y(), pop_w, pop_h)
+                # Map to scene to check collisions
+                scene_rect = self.mapRectToScene(test_rect)
+                
+                # Check if this area hits any OTHER SmartNode
+                # (items() returns all items in rect)
+                items_in_rect = self.scene().items(scene_rect)
+                collision = False
+                for item in items_in_rect:
+                    if isinstance(item, SmartNode) and item != self:
+                        collision = True
+                        break
+                
+                if not collision:
+                    best_pos = pos
+                    break # Found a clear spot!
+
+        self.popup.setPos(best_pos)
         self.popup.setVisible(True)
         super().hoverEnterEvent(event)
 
@@ -392,7 +679,7 @@ class SmartNode(QGraphicsRectItem):
         # Access static method, which returns instance
         cfg = ConfigManager._get_shared_instance()
         if cfg.get_hover_persistence():
-            self.hide_timer.start(300) 
+            self.hide_timer.start(50) 
         else:
             self.hide_timer.start(0)
 
@@ -419,20 +706,62 @@ class SmartNode(QGraphicsRectItem):
             self.toggle_collapse()
             event.accept()
         else:
+            # Hide popup immediately on interaction/drag start
+            self.stop_hide_timer()
+            self.popup.setVisible(False)
             super().mousePressEvent(event)
 
     def set_text_style(self, completed=False):
         font = QFont("Segoe UI", 11, QFont.Weight.Bold)
+        theme = self.main_window.theme_data
         if completed:
             font.setStrikeOut(True)
-            self.text_item.setDefaultTextColor(QColor("#B0B0B0"))
+            self.text_item.setDefaultTextColor(QColor(theme["text_dim"]))
         else:
             font.setStrikeOut(False)
-            self.text_item.setDefaultTextColor(Qt.GlobalColor.white)
+            self.text_item.setDefaultTextColor(QColor(theme["text_color"]))
         self.text_item.setFont(font)
 
     def update_name_from_text(self):
         self.name = self.text_item.toPlainText()
+        self.adjust_size()
+
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        
+        # Smart Linking (Drop-to-Connect)
+        # Check for collision with other nodes (Overlap)
+        colliding_items = self.scene().collidingItems(self, Qt.ItemSelectionMode.IntersectsItemShape)
+        
+        target_node = None
+        # Find the first valid SmartNode that isn't self
+        for item in colliding_items:
+            if isinstance(item, SmartNode) and item != self:
+                target_node = item
+                break
+        
+        if target_node:
+            # Found a target (Parent)! 
+            # Drop 'self' (Child) onto 'target_node' (Parent) -> Parent takes Child.
+            if hasattr(self.main_window, "auto_connect_nodes"):
+                # Connection: Target -> Self (Parent -> Child)
+                new_line = self.main_window.auto_connect_nodes(target_node, self)
+                
+                # If connected successfully, Collapse the parent to "take in" the child?
+                # User said: "parent node take in the child node by collapsing"
+                if new_line:
+                     if not target_node.is_collapsed:
+                         target_node.toggle_collapse() # This will hide the new child (self)
+                     else:
+                         # Parent is ALREADY collapsed.
+                         # We imply that 'self' (the child) should now disappear into it.
+                         # Since it's a child of a collapsed node, it should be hidden.
+                         self.setVisible(False)
+                         self.popup.setVisible(False) 
+                         # ALSO HIDE THE LINE!
+                         new_line.setVisible(False)
+
+
 
     def contextMenuEvent(self, event):
         menu = QMenu()
@@ -541,50 +870,237 @@ class SmartNode(QGraphicsRectItem):
             QDesktopServices.openUrl(QUrl.fromLocalFile(self.watch_path) if self.attachment_type != "Link" else QUrl(self.watch_path))
 
     def itemChange(self, change, value):
-        if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
-            for line in self.connected_lines:
+        if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():
+            new_pos = value
+            # Magnetic Snapping
+            # Snap to grid or other nodes? Let's snap to other nodes (alignment)
+            snap_distance = 15
+            x_snap = new_pos.x()
+            y_snap = new_pos.y()
+            
+            # Simple Grid Snap (if no other nodes close? or always?)
+            # Let's do Node-to-Node alignment
+            nearby_items = self.scene().items(QRectF(x_snap - 50, y_snap - 50, 300, 180)) # Search area
+            
+            sh = self.boundingRect().height()
+            sw = self.boundingRect().width()
+            
+            for item in nearby_items:
+                if isinstance(item, SmartNode) and item != self:
+                    # Align Left
+                    if abs(item.x() - x_snap) < snap_distance:
+                        x_snap = item.x()
+                    # Align Top
+                    if abs(item.y() - y_snap) < snap_distance:
+                         y_snap = item.y()
+                    # Align Center X
+                    if abs((item.x() + item.boundingRect().width()/2) - (x_snap + sw/2)) < snap_distance:
+                         x_snap = item.x() + item.boundingRect().width()/2 - sw/2
+                         
+            new_pos.setX(x_snap)
+            new_pos.setY(y_snap)
+            
+            # Update connected lines with snapped pos
+            # We must use new_pos because 'value' is what will be set
+            # But update_position uses self.pos() which isn't updated yet?
+            # Actually, standard practice is to return the modified value.
+            # The Lines will update in ItemPositionHasChanged or we just trigger it here but it might lag one frame.
+            # Best to let scene handle line updates or call it after safely.
+            # But here we just modify the return.
+            
+            value = new_pos
+
+        if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
+             for line in self.connected_lines:
                 line.update_position()
-            
-            # --- CRASH FIX ---
-            # Removed the ensureVisible call. 
-            # It creates infinite recursion loops during drag events.
-            # Stability is prioritized over auto-scroll.
-            
+
         return super().itemChange(change, value)
 
     def toggle_collapse(self):
         self.is_collapsed = not self.is_collapsed
+        
         if self.is_collapsed:
-            self.collapse_btn.setPlainText("[+]")
-            # self.setRect(0, 0, 200, 35) # NO SHRINKING
-            # self.type_item.setVisible(False) 
-            # self.text_item.setPos(5, 5)
-            self.set_visibility_recursive(False) # Hide children
+            self.collapse_btn.setPlainText("+")
+            # Animate Collapse
+            self.animate_children_visibility(False)
         else:
-            self.collapse_btn.setPlainText("[-]")
-            # self.setRect(0, 0, 200, 80) # Expanding back (if we were shrinking)
-            # self.type_item.setVisible(True)
-            # self.text_item.setPos(10, 15)
-            self.set_visibility_recursive(True) # Show children
+            self.collapse_btn.setPlainText("−")
+            # Smart Layout before showing
+            self.smart_layout_children()
+            # Animate Expand
+            self.animate_children_visibility(True)
         
         self.update()
 
-    def set_visibility_recursive(self, visible):
-        """Recursively hide/show downstream nodes."""
-        # Find downstream nodes via connected_lines where self is start_node
+    def smart_layout_children(self):
+        """Adjusts children positions to avoid collisions before expanding."""
+        # Get direct children
+        children = []
         for line in self.connected_lines:
             if line.start_node == self:
-                line.setVisible(visible)
+                children.append(line.end_node)
+        
+        if not children:
+            return
+
+        # Check for collisions and find new spots
+        scene = self.scene()
+        for child in children:
+            # If child is accidentally on top of parent (e.g. just created), move it
+            if self.collidesWithItem(child):
+                 child.setPos(self.x() + 250, self.y())
+
+            # Check collision with OTHERS
+            # Simple spiral search or shift down
+            original_pos = child.pos()
+            target_pos = original_pos
+            
+            # Safety break
+            attempts = 0
+            while True:
+                # Check collision at target_pos
+                rect = child.rect()
+                # fast check: map rect to scene at target_pos
+                scene_rect = QRectF(target_pos.x(), target_pos.y(), rect.width(), rect.height())
+                
+                items = scene.items(scene_rect)
+                collision = False
+                for item in items:
+                    if isinstance(item, SmartNode) and item != child and item != self:
+                        # We collide with another node
+                        # Is it a child of ours? Ignoring siblings for now might be okay, 
+                        # but ideally we avoid them too. 
+                        # For simple fix: avoid ANY SmartNode that isn't self or child itself.
+                        collision = True
+                        break
+                
+                if not collision:
+                    break
+                
+                # Move down
+                target_pos.setY(target_pos.y() + 100)
+                attempts += 1
+                if attempts > 20: break # Give up
+            
+            if target_pos != original_pos:
+                child.setPos(target_pos)
+                # print(f"Moved child {child.name} to avoid collision.")
+
+    def animate_children_visibility(self, visible):
+        """Recursively animate opacity for downstream nodes."""
+        self.set_visibility_recursive_animated(visible)
+
+    def set_visibility_recursive_animated(self, visible):
+        for line in self.connected_lines:
+            if line.start_node == self:
                 child = line.end_node
                 
-                # Recursion:
-                child.setVisible(visible) 
-                
                 if visible:
-                    if not child.is_collapsed:
-                        child.set_visibility_recursive(True)
+                    # --- EXPAND SEQUENCE ---
+                    # 1. Setup Initial State (Hidden but Present)
+                    line.setVisible(True)
+                    child.setVisible(True)
+                    line.set_drawing_progress(0.0)
+                    child.setOpacity(0.0)
+                    
+                    # 2. Animate Line Growth
+                    anim_line = QVariantAnimation()
+                    anim_line.setStartValue(0.0)
+                    anim_line.setEndValue(1.0)
+                    anim_line.setDuration(250) # Fast line
+                    anim_line.setEasingCurve(QEasingCurve.Type.OutQuad)
+                    anim_line.valueChanged.connect(line.set_drawing_progress)
+                    
+                    # 3. On Line Finish -> Fade In Node
+                    def on_line_finished(captured_child=child):
+                        # Fade In + Scale Up (Pop effect)
+                        self.animate_node_appearance(captured_child)
+                        
+                        # CAUTION: If we recurse here, it creates a "wave"
+                        if not captured_child.is_collapsed:
+                            captured_child.set_visibility_recursive_animated(True)
+
+                    anim_line.finished.connect(on_line_finished)
+                    anim_line.start()
+                    line._anim = anim_line # Keep reference
+                    
                 else:
-                    child.set_visibility_recursive(False)
+                    # --- COLLAPSE SEQUENCE ---
+                    # 1. Fade Out Node
+                    def on_node_faded(captured_line=line, captured_child=child):
+                        # 2. Retract Line
+                        anim_line = QVariantAnimation()
+                        anim_line.setStartValue(1.0)
+                        anim_line.setEndValue(0.0)
+                        anim_line.setDuration(200)
+                        anim_line.setEasingCurve(QEasingCurve.Type.InQuad)
+                        anim_line.valueChanged.connect(captured_line.set_drawing_progress)
+                        
+                        def on_line_retracted():
+                            captured_line.setVisible(False)
+                            captured_child.setVisible(False)
+                            
+                        anim_line.finished.connect(on_line_retracted)
+                        anim_line.start()
+                        captured_line._anim = anim_line
+
+                    # Animate Out (Scale Down + Fade)
+                    self.animate_node_disappearance(child, callback=on_node_faded)
+                    
+                    if not child.is_collapsed:
+                         child.set_visibility_recursive_animated(False)
+
+    def animate_node_appearance(self, node):
+        node.setTransformOriginPoint(node.boundingRect().center())
+        
+        # We need to store animation ref
+        anim = QVariantAnimation() 
+        node._appear_anim = anim
+        anim.setStartValue(0.0)
+        anim.setEndValue(1.0)
+        anim.setDuration(300)
+        anim.setEasingCurve(QEasingCurve.Type.OutBack) # Slight overshoot for "pop"
+        
+        def update_props(val):
+            node.setOpacity(val)
+            node.setScale(val)
+            
+        anim.valueChanged.connect(update_props)
+        anim.start()
+
+    def animate_node_disappearance(self, node, callback=None):
+        node.setTransformOriginPoint(node.boundingRect().center())
+        
+        anim = QVariantAnimation() 
+        node._disappear_anim = anim
+        anim.setStartValue(1.0)
+        anim.setEndValue(0.0)
+        anim.setDuration(250)
+        anim.setEasingCurve(QEasingCurve.Type.InBack)
+        
+        def update_props(val):
+            node.setOpacity(val)
+            node.setScale(val)
+            
+        anim.valueChanged.connect(update_props)
+        if callback:
+            anim.finished.connect(callback)
+        anim.start()
+
+    def fade_node(self, node, start, end, callback=None):
+        # Legacy fade, keeping for generic use if needed
+        anim = QVariantAnimation() 
+        node._fade_anim = anim
+        anim.setStartValue(start)
+        anim.setEndValue(end)
+        anim.setDuration(300)
+        anim.setEasingCurve(QEasingCurve.Type.OutQuad)
+        anim.valueChanged.connect(node.setOpacity)
+        
+        if callback:
+             anim.finished.connect(callback)
+             
+        anim.start()
 
     def check_status(self):
         # Update Color
@@ -606,7 +1122,8 @@ class SmartNode(QGraphicsRectItem):
         if self.is_start_node:
             self.setPen(self.pen_start)
         else:
-            self.pen_default.setColor(QColor("#555555")) # Subtle border
+            # Use theme color for border
+            self.pen_default.setColor(QColor(self.main_window.theme_data["node_border_color"])) 
             self.pen_default.setWidth(1)
             self.setPen(self.pen_default)
 
@@ -643,9 +1160,26 @@ class SmartNode(QGraphicsRectItem):
 
 # --- 4. The Main Window ---
 class SmartWorkflowOrganizer(QMainWindow):
+    update_available = pyqtSignal(str, str, str) # version, url, notes
+
     def __init__(self):
         super().__init__()
         
+        # Connect Update Signal
+        self.update_available.connect(self.show_update_notification)
+        
+        # Start Background Check
+        import threading
+        threading.Thread(target=self.run_update_check, daemon=True).start()
+
+        # Set Window Icon
+        try:
+            icon_path = resource_path("assets/icon.bmp")
+            if os.path.exists(icon_path):
+                self.setWindowIcon(QIcon(icon_path))
+        except Exception:
+            pass
+
         # Initialize Config Manager
         from src.config_manager import ConfigManager
         self.config_manager = ConfigManager()
@@ -657,22 +1191,16 @@ class SmartWorkflowOrganizer(QMainWindow):
         self.save_file_path = self.config_manager.get_data_path()
         self.pipelines_data = {} 
         self.current_pipeline_name = "Default Project"
+        
+        # Load Theme
+        self.theme_data = self.config_manager.get_theme_data()
+        from src.themes import ThemeManager
+        use_gradient = self.config_manager.is_gradient_enabled()
+        self.setStyleSheet(ThemeManager.get_stylesheet(self.config_manager.get_theme(), use_gradient))
 
-        self.setStyleSheet("""
-            QMainWindow { background-color: #1e1e1e; }
-            QGraphicsView { background-color: #1e1e1e; border: 1px solid #3e3e42;}
-            QLabel { color: #d4d4d4; font-family: 'Segoe UI'; }
-            QPushButton { 
-                background-color: #007acc; color: white; border: none; 
-                padding: 6px 12px; font-size: 13px; border-radius: 4px;
-            }
-            QPushButton:hover { background-color: #0062a3; }
-            QComboBox { 
-                background-color: #3e3e42; color: white; padding: 5px; border-radius: 4px; min-width: 150px;
-            }
-            QMenu { background-color: #252526; color: white; border: 1px solid #3e3e42; }
-            QMenu::item:selected { background-color: #007acc; }
-        """)
+        # Inline overrides for specific needs if any, utilizing theme variables would be better but stylesheet handles most.
+        # However, QGraphicsView bg is handled by stylesheet now in ThemeManager.
+
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -751,26 +1279,67 @@ class SmartWorkflowOrganizer(QMainWindow):
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_all_nodes)
         self.timer.start(2000) 
+        
+        self.animate_fade_in()
+
+    def animate_fade_in(self):
+        try:
+            from PyQt6.QtCore import QPropertyAnimation, QEasingCurve
+            from PyQt6.QtWidgets import QGraphicsOpacityEffect
+            self.opacity_effect = QGraphicsOpacityEffect(self)
+            self.setGraphicsEffect(self.opacity_effect)
+            
+            self.anim = QPropertyAnimation(self.opacity_effect, b"opacity")
+            self.anim.setDuration(800)
+            self.anim.setStartValue(0)
+            self.anim.setEndValue(1)
+            self.anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+            self.anim.start()
+        except ImportError:
+            pass 
 
     # --- NAVIGATION LOGIC ---
     def open_settings(self):
-        from src.settings_dialog import SettingsDialog
-        dialog = SettingsDialog(self.config_manager, self)
-        if dialog.exec():
-            # 1. Reload Path
-            new_path = self.config_manager.get_data_path()
-            if new_path != self.save_file_path:
-                self.save_file_path = new_path
-                self.load_from_disk()
-                print(f"Reloaded data from: {self.save_file_path}")
+        try:
+            from src.settings_dialog import SettingsDialog
+            dlg = SettingsDialog(self.config_manager, self, apply_callback=self.apply_theme)
+            if dlg.exec():
+                # Reload settings if saved (redundant if using live preview, but good practice)
+                self.apply_theme()
+                self.update_grid_color() # Grid might change
+        except Exception as e:
+            QMessageBox.critical(self, "Settings Error", f"Could not open settings:\n{e}")
+            import traceback
+            traceback.print_exc() # Print to console for debugging
+
+    def apply_theme(self):
+        """Reloads the theme from config."""
+        from src.themes import ThemeManager
+        theme = self.config_manager.get_theme()
+        use_gradient = self.config_manager.is_gradient_enabled()
+        self.setStyleSheet(ThemeManager.get_stylesheet(theme, use_gradient))
+        
+        # Grid color might change
+        self.update_grid_color()
+        
+        # Redraw nodes to update borders
+        for item in self.scene.items():
+            if hasattr(item, "update_style"):
+                item.update_style()
+                
+        # Apply Globally to ensure Scrollbars (and everything else) get styled
+        app = QApplication.instance()
+        if app:
+            app.setStyle("Fusion")
+            stylesheet = ThemeManager.get_stylesheet(theme, use_gradient)
+            app.setStyleSheet(stylesheet)
             
-            # 2. Reload Auto-Save
-            interval = self.config_manager.get_auto_save_interval()
-            self.timer.setInterval(interval * 1000)
-            
-            # 3. Apply Theme (Stub for now, but logical place)
-            # theme = self.config_manager.get_theme()
-            # self.apply_theme(theme)
+            # Also apply to self to be safe
+            self.setStyleSheet(stylesheet)
+
+    def update_grid_color(self):
+        """Forces a repaint of the graphics view to update the grid."""
+        self.view.viewport().update()
 
     def return_to_launcher(self):
         self.save_current_pipeline_to_memory()
@@ -827,11 +1396,79 @@ class SmartWorkflowOrganizer(QMainWindow):
     # --- PROJECT MANAGEMENT ---
     def show_project_options(self):
         menu = QMenu()
+        
         act_rename = menu.addAction("Rename Project")
         act_rename.triggered.connect(self.rename_project)
+        
         act_delete = menu.addAction("Delete Project")
         act_delete.triggered.connect(self.delete_project)
+        
+        menu.addSeparator()
+        
+        act_export = menu.addAction("Export Project (JSON)")
+        act_export.triggered.connect(self.export_project)
+        
+        act_import = menu.addAction("Import Project (JSON)")
+        act_import.triggered.connect(self.import_project)
+        
         menu.exec(self.btn_proj_opt.mapToGlobal(self.btn_proj_opt.rect().bottomLeft()))
+
+    def export_project(self):
+        """Exports the current project to a JSON file."""
+        self.save_current_pipeline_to_memory()
+        data = self.pipelines_data.get(self.current_pipeline_name, {})
+        
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Export Project", 
+            f"{self.current_pipeline_name}.json", 
+            "JSON Files (*.json)"
+        )
+        
+        if file_path:
+            try:
+                with open(file_path, 'w') as f:
+                    json.dump(data, f, indent=4)
+                QMessageBox.information(self, "Success", f"Project exported to:\n{file_path}")
+            except Exception as e:
+                QMessageBox.critical(self, "Export Failed", f"Could not save file:\n{e}")
+
+    def import_project(self):
+        """Imports a project from a JSON file."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Import Project", 
+            "", 
+            "JSON Files (*.json)"
+        )
+        
+        if file_path:
+            try:
+                with open(file_path, 'r') as f:
+                    data = json.load(f)
+                
+                # Basic Validation
+                if "nodes" not in data or "edges" not in data:
+                    QMessageBox.warning(self, "Invalid File", "This JSON does not look like a valid project file.")
+                    return
+
+                # Determine New Name
+                base_name = os.path.splitext(os.path.basename(file_path))[0]
+                new_name = base_name
+                counter = 1
+                while new_name in self.pipelines_data:
+                    new_name = f"{base_name} ({counter})"
+                    counter += 1
+                
+                # Add to Pipelines
+                self.pipelines_data[new_name] = data
+                
+                # Update UI
+                self.combo_pipelines.addItem(new_name)
+                self.combo_pipelines.setCurrentText(new_name)
+                
+                QMessageBox.information(self, "Success", f"Project imported as '{new_name}'")
+                
+            except Exception as e:
+                QMessageBox.critical(self, "Import Failed", f"Could not load file:\n{e}")
 
     def rename_project(self):
         old_name = self.current_pipeline_name
@@ -1003,19 +1640,101 @@ class SmartWorkflowOrganizer(QMainWindow):
         if len(selected_nodes) == 2:
             self.create_connection(selected_nodes[0], selected_nodes[1])
 
-    def create_connection(self, start_node, end_node):
-        line = ConnectionLine(start_node, end_node)
+    def auto_connect_nodes(self, start_node, end_node):
+        # Auto-connect logic (Drop-to-Connect)
+        # Returns the created line if connection created, None otherwise
+        line = self.create_connection(start_node, end_node)
+        if line:
+            print(f"Auto-connected {start_node.name} -> {end_node.name}")
+            return line
+        return None
+
+    def create_connection(self, start, end):
+        # Prevent self-loops
+        if start == end:
+            return None
+
+        # Check duplicates
+        for line in self.lines:
+            if line.start_node == start and line.end_node == end:
+                return None
+            if line.start_node == end and line.end_node == start:
+                return None 
+
+        # Create Line
+        line = SmartLine(start, end, self)
         self.scene.addItem(line)
         self.lines.append(line)
-        start_node.connected_lines.append(line)
-        end_node.connected_lines.append(line)
+        
+        start.connected_lines.append(line)
+        end.connected_lines.append(line)
+        
+        # Send behind nodes
+        line.setZValue(-1) 
+        return line
+
+    def delete_node(self, node):
+        # Remove connections first
+        for line in list(node.connected_lines):
+            self.remove_line(line)
+        
+        self.scene.removeItem(node)
+        if node in self.nodes:
+            self.nodes.remove(node)
+        self.update_progress()
+
+    def remove_line(self, line):
+        if line in self.lines:
+             self.lines.remove(line)
+        self.scene.removeItem(line)
+        # Update nodes
+        if line.start_node and line in line.start_node.connected_lines:
+            line.start_node.connected_lines.remove(line)
+        if line.end_node and line in line.end_node.connected_lines:
+            line.end_node.connected_lines.remove(line)
+
+    def delete_selected_items(self):
+        selected = self.scene.selectedItems()
+        for item in selected:
+            if isinstance(item, SmartLine):
+                self.remove_line(item)
+            elif isinstance(item, SmartNode):
+                self.delete_node(item)
 
     def update_all_nodes(self):
         for node in self.nodes:
             node.check_status()
 
+    def run_update_check(self):
+        try:
+            from src.utils.updater import UpdateManager
+            from src.version import UPDATE_JSON_URL
+            
+            updater = UpdateManager(UPDATE_JSON_URL)
+            has_update, new_ver, url, notes = updater.check_for_updates()
+            
+            if has_update:
+                self.update_available.emit(new_ver, url, notes)
+        except Exception as e:
+            print(f"Update check failed: {e}")
+
+    def show_update_notification(self, new_version, url, notes):
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Update Available 🚀")
+        msg.setText(f"A new version of Smart DAG Organizer is available!\n\nVersion: {new_version}\n\n{notes}")
+        msg.setIcon(QMessageBox.Icon.Information)
+        
+        btn_download = msg.addButton("Download Update", QMessageBox.ButtonRole.AcceptRole)
+        msg.addButton("Later", QMessageBox.ButtonRole.RejectRole)
+        
+        msg.exec()
+        
+        if msg.clickedButton() == btn_download:
+            QDesktopServices.openUrl(QUrl(url))
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setStyle("Fusion")
     window = SmartWorkflowOrganizer()
     window.show()
     sys.exit(app.exec())

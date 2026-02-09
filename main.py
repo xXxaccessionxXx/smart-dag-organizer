@@ -12,6 +12,9 @@ from PyQt6.QtWidgets import QApplication
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setStyle("Fusion")
+    
+    # Ensure launcher applies theme globally
     window = GenesisLauncher()
     window.show()
     sys.exit(app.exec())

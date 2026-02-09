@@ -17,7 +17,11 @@ try:
     from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, 
                                  QWidget, QLabel, QPushButton, QMessageBox)
     from PyQt6.QtCore import Qt
-    from PyQt6.QtGui import QFont, QColor
+    from PyQt6.QtGui import QFont, QColor, QIcon
+    try:
+        from src.utils.assets import resource_path
+    except ImportError:
+         def resource_path(p): return p
 except ImportError:
     show_error_and_exit("PyQt6")
 
@@ -44,141 +48,188 @@ class GenesisLauncher(QMainWindow):
         super().__init__()
         self.setWindowTitle("Project Genesis - Hub")
         self.resize(800, 600)
+        
+        # Set Window Icon
+        try:
+            icon_path = resource_path("assets/icon.bmp")
+            if os.path.exists(icon_path):
+                self.setWindowIcon(QIcon(icon_path))
+        except Exception:
+            pass
 
-        # Apply the consistent Dark Theme
-        self.setStyleSheet("""
-            QMainWindow { background-color: #1e1e1e; }
-            QLabel { color: #d4d4d4; font-family: 'Segoe UI'; }
-            QPushButton { 
-                background-color: #252526; 
-                color: white; 
-                font-family: 'Segoe UI';
-                font-size: 16px;
-                border: 1px solid #3e3e42; 
-                padding: 15px 30px; 
-                border-radius: 8px;
-                text-align: left;
-            }
-            QPushButton:hover { 
-                background-color: #007acc; 
-                border: 1px solid #007acc;
-            }
-            QPushButton:disabled {
-                background-color: #1e1e1e;
-                color: #555555;
-                border: 1px dashed #3e3e42;
-            }
-        """)
+        # Apply Theme
+        self.apply_theme()
 
         # Central Layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        layout = QVBoxLayout(central_widget)
-        layout.setSpacing(15)
-        layout.setContentsMargins(100, 60, 100, 60) # Generous margins for a clean look
+        # Use Grid Layout for Hub Design
+        from PyQt6.QtWidgets import QGridLayout
+        layout = QGridLayout(central_widget)
+        layout.setSpacing(20)
+        layout.setContentsMargins(50, 50, 50, 50) 
 
         # --- Header Section ---
         title = QLabel("PROJECT GENESIS")
-        title.setStyleSheet("font-size: 36px; font-weight: bold; color: white; letter-spacing: 2px;")
+        title.setStyleSheet("font-size: 48px; font-weight: bold; letter-spacing: 4px; color: white;") 
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
-
+        layout.addWidget(title, 0, 0, 1, 2) # Span 2 columns
+        
         subtitle = QLabel("Select a module to begin")
-        subtitle.setStyleSheet("font-size: 16px; color: #888888; margin-bottom: 20px;")
+        subtitle.setStyleSheet("font-size: 18px; margin-bottom: 40px; color: #aaaaaa;") 
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(subtitle)
+        layout.addWidget(subtitle, 1, 0, 1, 2)
 
-        # --- Buttons Section ---
-        # 1. The Workflow Organizer (Active)
-        btn_workflow = QPushButton("📂   Workflow Organizer")
-        btn_workflow.clicked.connect(self.launch_workflow)
-        layout.addWidget(btn_workflow)
+        # --- Buttons Section (Grid) ---
+        # Helper to create big buttons
+        def create_card_button(text, icon, callback):
+            btn = QPushButton(f"{icon}\n\n{text}")
+            btn.setFixedSize(250, 180)
+            btn.setStyleSheet("""
+                QPushButton {
+                    font-size: 18px; font-weight: bold;
+                    border-radius: 12px;
+                    border: 2px solid #444;
+                    background-color: rgba(60, 60, 65, 0.6);
+                    color: white;
+                }
+                QPushButton:hover {
+                    background-color: rgba(80, 80, 90, 0.8);
+                    border: 2px solid #007acc;
+                }
+            """)
+            btn.clicked.connect(callback)
+            return btn
 
-        # 2. Neural Assistant
-        btn_ai = QPushButton("🤖   Neural Assistant")
-        btn_ai.clicked.connect(self.launch_assistant)
-        layout.addWidget(btn_ai)
+        # 1. Workflow
+        btn_workflow = create_card_button("Workflow", "📂", self.launch_workflow)
+        layout.addWidget(btn_workflow, 2, 0)
 
-        # 3. Script Library
-        btn_scripts = QPushButton("📜   Script Library")
-        btn_scripts.clicked.connect(self.launch_library) # Connect function
-        btn_scripts.clicked.connect(self.launch_library) # Connect function
-        layout.addWidget(btn_scripts)
+        # 2. Script Library
+        btn_scripts = create_card_button("Script Library", "📜", self.launch_library) 
+        layout.addWidget(btn_scripts, 2, 1)
+
+        # 3. Neural Assistant
+        self.btn_ai = create_card_button("Neural Assistant", "🤖", self.launch_assistant)
+        layout.addWidget(self.btn_ai, 3, 0)
 
         # 4. Settings / Toggle
-        self.btn_toggle = QPushButton("Enable AI Module")
-        self.btn_toggle.clicked.connect(self.toggle_ai)
-        self.btn_toggle.setStyleSheet("background-color: #333333; font-size: 14px; padding: 10px;")
-        layout.addWidget(self.btn_toggle)
+        # Grouping Settings and Toggle for the 4th slot? Or just Toggle?
+        # Let's make the 4th slot a "System" card that toggles AI or opens Settings?
+        # For now, sticking to the plan: Toggle AI. 
+        # But wait, we need Settings access too! 
+        # Let's add a small settings button in corner, and use 4th slot for Toggle AI?
         
-        # Initial State
-        self.btn_ai = btn_ai
-        self.update_ui_state()
-
-        layout.addStretch()
+        self.btn_toggle = create_card_button("Enable AI", "⚡", self.toggle_ai)
+        layout.addWidget(self.btn_toggle, 3, 1)
 
         # Footer
-        footer = QLabel("System v1.1 | Ready")
+        footer = QLabel("System v2.0 | Ready")
         footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        footer.setStyleSheet("color: #444444; font-size: 12px;")
-        layout.addWidget(footer)
-
-    def launch_workflow(self):
-        if SmartWorkflowOrganizer:
-            # Create the tool window
-            self.tool_window = SmartWorkflowOrganizer()
-            self.tool_window.show()
-            # Close the menu (or use self.hide() if you want to keep it running)
-            self.close()
-        else:
-            QMessageBox.critical(self, "Error", "Could not find 'workflow_organizer.py'.\nMake sure both files are in the same folder.")
-
-    def launch_library(self):
-        if ScriptLibrary:
-            self.lib_window = ScriptLibrary()
-            self.lib_window.show()
-            self.close()
-        else:
-            QMessageBox.critical(self, "Error", "Could not find 'script_library.py'.")
-
-    def launch_assistant(self):
-        if NeuralAssistant:
-            self.ai_window = NeuralAssistant()
-            self.ai_window.show()
-            self.close()
-        else:
-            QMessageBox.critical(self, "Error", "Could not find 'neural_assistant.py'.")
-
-    def toggle_ai(self):
-        if not ConfigManager:
-            QMessageBox.critical(self, "Error", "ConfigManager not loaded.")
-            return
-
-        current_state = ConfigManager.is_ai_enabled()
-        new_state = not current_state
-        ConfigManager.set_ai_enabled(new_state)
+        footer.setStyleSheet("font-size: 12px; color: #666; margin-top: 20px;")
+        layout.addWidget(footer, 4, 0, 1, 2)
         
+        # Center the grid in the window
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.btn_ai_ref = self.btn_ai # Keep ref for updates
         self.update_ui_state()
         
-        state_str = "ENABLED" if new_state else "DISABLED"
-        QMessageBox.information(self, "AI Module", f"Neural Assistant is now {state_str}.\nPlease restart other modules to apply changes.")
+        self.animate_fade_in()
+
+    def animate_fade_in(self):
+        try:
+            from PyQt6.QtCore import QPropertyAnimation, QEasingCurve
+            
+            # Opacity Effect
+            from PyQt6.QtWidgets import QGraphicsOpacityEffect
+            self.opacity_effect = QGraphicsOpacityEffect(self)
+            self.setGraphicsEffect(self.opacity_effect)
+            
+            self.anim = QPropertyAnimation(self.opacity_effect, b"opacity")
+            self.anim.setDuration(800)
+            self.anim.setStartValue(0)
+            self.anim.setEndValue(1)
+            self.anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+            self.anim.start()
+        except ImportError:
+            pass
+
+    def launch_workflow(self):
+        try:
+            from src.workflow_organizer import SmartWorkflowOrganizer
+            self.workflow_window = SmartWorkflowOrganizer()
+            self.workflow_window.show()
+            self.close()
+        except ImportError as e:
+            QMessageBox.critical(self, "Error", f"Could not load Workflow Organizer: {e}")
+
+    def launch_library(self):
+        try:
+            from src.script_library import ScriptLibrary
+            self.library_window = ScriptLibrary()
+            self.library_window.show()
+            self.close()
+        except ImportError as e:
+             QMessageBox.critical(self, "Error", f"Could not load Script Library: {e}")
+        
+    def launch_assistant(self):
+        try:
+            from src.ai.assistant import NeuralAssistant
+            self.assistant_window = NeuralAssistant()
+            self.assistant_window.show()
+        except ImportError:
+            QMessageBox.warning(self, "Module Missing", "Neural Assistant module not found.")
+
+    def toggle_ai(self):
+        if ConfigManager:
+            enabled = not ConfigManager.is_ai_enabled()
+            ConfigManager.set_ai_enabled(enabled)
+            self.update_ui_state()
+            
+            status = "Enabled" if enabled else "Disabled"
+            QMessageBox.information(self, "AI Module", f"Neural Assistant {status}.")
+            
+    def apply_theme(self):
+        try:
+            if ConfigManager:
+                cfg = ConfigManager._get_shared_instance()
+                theme_name = cfg.get_theme()
+                use_gradient = cfg.is_gradient_enabled()
+                from src.themes import ThemeManager
+                stylesheet = ThemeManager.get_stylesheet(theme_name, use_gradient)
+                
+                app = QApplication.instance()
+                if app:
+                    app.setStyle("Fusion")
+                    app.setStyleSheet(stylesheet)
+                else:
+                    self.setStyleSheet(stylesheet)
+
+        except Exception as e:
+            print(f"Error applying theme: {e}")
 
     def update_ui_state(self):
         if ConfigManager:
             enabled = ConfigManager.is_ai_enabled()
-            self.btn_ai.setEnabled(enabled)
-            self.btn_ai.setText(f"🤖   Neural Assistant {'(Active)' if enabled else '(Inactive)'}")
-            self.btn_toggle.setText(f"{'Disable' if enabled else 'Enable'} AI Module")
+            self.btn_ai_ref.setEnabled(enabled)
+            self.btn_ai_ref.setText(f"🤖\n\nNeural Assistant\n{' (Active)' if enabled else ' (Inactive)'}")
+            self.btn_toggle.setText(f"⚡\n\n{'Disable' if enabled else 'Enable'} AI")
             
             # Update style to reflect state
             if enabled:
-                self.btn_ai.setStyleSheet("") # Default
+                # Default style is already set in create_card_button
+                pass 
             else:
-                 self.btn_ai.setStyleSheet("color: #555555; border: 1px dashed #3e3e42;")
+                 self.btn_ai_ref.setStyleSheet("QPushButton { background-color: rgba(30, 30, 30, 0.5); color: #555; border: 2px dashed #444; border-radius: 12px; font-size: 18px; font-weight: bold; }")
 
 # --- Entry Point ---
 if __name__ == "__main__":
+    from src.utils.logger import CrashHandler
+    CrashHandler.setup()
+    
     app = QApplication(sys.argv)
+    app.setStyle("Fusion")
     window = GenesisLauncher()
     window.show()
     sys.exit(app.exec())

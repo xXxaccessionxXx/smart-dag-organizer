@@ -4,61 +4,76 @@ import json
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QListWidget, QPlainTextEdit, QLabel, 
                              QPushButton, QInputDialog, QMessageBox, QSplitter,
-                             QComboBox, QTabWidget)
+                             QComboBox, QTabWidget, QLineEdit)
 from PyQt6.QtGui import QColor, QFont, QIcon, QSyntaxHighlighter, QTextCharFormat
 from PyQt6.QtCore import Qt, QRegularExpression, QFileSystemWatcher, QTimer
+from src.themes import ThemeManager
+from config_manager import ConfigManager
 
 # ... (Previous imports remain, ensure QFileSystemWatcher is added)
 
 # --- SYNTAX HIGHLIGHTER ---
-class PythonHighlighter(QSyntaxHighlighter):
+# --- SYNTAX HIGHLIGHTER ---
+class UniversalHighlighter(QSyntaxHighlighter):
     def __init__(self, document):
         super().__init__(document)
-        
-        self.highlighting_rules = []
+        self.rules = []
+        self.current_language = "Python"
+        self.update_rules("Python")
 
-        # Keyword Format
-        keyword_format = QTextCharFormat()
-        keyword_format.setForeground(QColor("#569cd6")) # VS Code Blue
-        keyword_format.setFontWeight(QFont.Weight.Bold)
-        keywords = [
-            "def", "class", "if", "else", "elif", "while", "for", "in", "try", "except",
-            "import", "from", "return", "True", "False", "None", "and", "or", "not", "as",
-            "with", "pass", "lambda", "break", "continue", "global", "nonlocal", "raise", 
-            "yield", "del", "assert", "async", "await"
-        ]
+    def set_language(self, language):
+        self.current_language = document_language = language
+        self.update_rules(language)
+        self.rehighlight()
+
+    def update_rules(self, language):
+        self.rules = []
+        
+        # Common formats
+        keyword_fmt = QTextCharFormat()
+        keyword_fmt.setForeground(QColor("#569cd6")) 
+        keyword_fmt.setFontWeight(QFont.Weight.Bold)
+        
+        string_fmt = QTextCharFormat()
+        string_fmt.setForeground(QColor("#ce9178"))
+        
+        comment_fmt = QTextCharFormat()
+        comment_fmt.setForeground(QColor("#6a9955"))
+        
+        class_fmt = QTextCharFormat()
+        class_fmt.setForeground(QColor("#4ec9b0"))
+        
+        if language == "Python":
+            keywords = [
+                "def", "class", "if", "else", "elif", "while", "for", "in", "try", "except",
+                "import", "from", "return", "True", "False", "None", "and", "or", "not", "as",
+                "with", "pass", "lambda", "break", "continue", "global", "nonlocal", "raise", 
+                "yield", "del", "assert", "async", "await"
+            ]
+            self.rules.append((QRegularExpression(r"\".*\""), string_fmt))
+            self.rules.append((QRegularExpression(r"'.*'"), string_fmt))
+            self.rules.append((QRegularExpression(r"#[^\n]*"), comment_fmt))
+            
+        elif language == "Java":
+            keywords = [
+                "public", "private", "protected", "class", "static", "void", "main", "int", 
+                "double", "float", "boolean", "char", "String", "if", "else", "for", "while", 
+                "return", "new", "this", "super", "extends", "implements", "interface", "package", 
+                "import", "try", "catch", "finally", "throw", "throws", "null", "true", "false"
+            ]
+            self.rules.append((QRegularExpression(r"\".*\""), string_fmt))
+            self.rules.append((QRegularExpression(r"//[^\n]*"), comment_fmt))
+            self.rules.append((QRegularExpression(r"/\*.*?\*/"), comment_fmt)) # Multi-line simple approx
+            
+        else:
+            keywords = []
+
         for word in keywords:
             pattern = QRegularExpression(r"\b" + word + r"\b")
-            self.highlighting_rules.append((pattern, keyword_format))
-
-        # String Format
-        string_format = QTextCharFormat()
-        string_format.setForeground(QColor("#ce9178")) # VS Code Orange/Red
-        self.highlighting_rules.append((QRegularExpression(r"\".*\""), string_format))
-        self.highlighting_rules.append((QRegularExpression(r"'.*'"), string_format))
-
-        # Comment Format
-        comment_format = QTextCharFormat()
-        comment_format.setForeground(QColor("#6a9955")) # VS Code Green
-        self.highlighting_rules.append((QRegularExpression(r"#[^\n]*"), comment_format))
-
-        # Function Format (simple approximation)
-        func_format = QTextCharFormat()
-        func_format.setForeground(QColor("#dcdcaa")) # Light Yellow
-        self.highlighting_rules.append((QRegularExpression(r"\b[A-Za-z0-9_]+(?=\()"), func_format))
-        
-        # Decorator Format
-        decorator_format = QTextCharFormat()
-        decorator_format.setForeground(QColor("#dcdcaa"))
-        self.highlighting_rules.append((QRegularExpression(r"@[A-Za-z0-9_]+"), decorator_format))
-
-        self.enabled = True
+            self.rules.append((pattern, keyword_fmt))
 
     def highlightBlock(self, text):
-        if not self.enabled:
-            return
-
-        for pattern, format in self.highlighting_rules:
+        for pattern, format in self.rules:
             match_iterator = pattern.globalMatch(text)
             while match_iterator.hasNext():
                 match = match_iterator.next()
@@ -78,52 +93,19 @@ class ScriptLibrary(QMainWindow):
         self.current_script = None
 
         # --- UI STYLING (Matching the DAG) ---
-        self.setStyleSheet("""
-            QMainWindow { background-color: #1e1e1e; }
-            QWidget { color: #d4d4d4; font-family: 'Segoe UI'; font-size: 14px; }
-            
-            /* The List Sidebar */
-            QListWidget {
-                background-color: #252526;
-                border: 1px solid #3e3e42;
-                border-radius: 4px;
-                padding: 5px;
-                outline: none;
-            }
-            QListWidget::item { padding: 8px; border-radius: 4px; }
-            QListWidget::item:selected { background-color: #37373d; color: white; }
-            QListWidget::item:hover { background-color: #2a2d2e; }
+        cfg = ConfigManager._get_shared_instance()
+        theme_name = cfg.get_theme()
+        use_gradient = cfg.is_gradient_enabled()
+        self.setStyleSheet(ThemeManager.get_stylesheet(theme_name, use_gradient))
 
-            /* The Code Editor */
-            QPlainTextEdit {
-                background-color: #1e1e1e;
-                border: 1px solid #3e3e42;
-                border-radius: 4px;
-                font-family: 'Consolas', 'Courier New', monospace;
-                font-size: 13px;
-                color: #d4d4d4; 
-                padding: 10px;
-            }
-
-            /* Buttons & Combos */
-            QPushButton { 
-                background-color: #3e3e42; color: white; border: 1px solid #555; 
-                padding: 6px 15px; border-radius: 4px;
-            }
-            QPushButton:hover { background-color: #505055; }
-            
-            QPushButton#ActionBtn { background-color: #007acc; border: none; }
-            QPushButton#ActionBtn:hover { background-color: #0062a3; }
-
-            QPushButton#DeleteBtn { background-color: #d73a49; border: none; }
-            QPushButton#DeleteBtn:hover { background-color: #a32a35; }
-            
-            QComboBox {
-                background-color: #3e3e42; color: white; border: 1px solid #555;
-                padding: 4px; border-radius: 4px; min-width: 100px;
-            }
-            QComboBox QAbstractItemView { background-color: #252526; color: white; selection-background-color: #007acc; }
-        """)
+        # Additional overrides handled by stylesheet in ThemeManager now
+        # But we need to ensure specific widget styles that were inline are preserved if ThemeManager doesn't cover them.
+        # ThemeManager stylesheet covers QListWidget, QPlainTextEdit generic colors.
+        # But some specific borders/radius might be worth keeping if ThemeManager is generic.
+        # Actually, ThemeManager is quite comprehensive now. Let's trust it for colors and add structural styles if needed.
+        
+        # Override for specific layout needs if not in ThemeManager
+        # ... logic below handles layout widgets ...
 
         # --- Main Layout ---
         central = QWidget()
@@ -154,9 +136,22 @@ class ScriptLibrary(QMainWindow):
 
         # Language Selector
         self.combo_lang = QComboBox()
-        self.combo_lang.addItems(["Plain Text", "Python"])
+        self.combo_lang.addItems(["Plain Text", "Python", "Java"])
         self.combo_lang.currentIndexChanged.connect(self.change_language)
         toolbar.addWidget(self.combo_lang)
+
+        # Search Bar
+        self.txt_search = QLineEdit()
+        self.txt_search.setPlaceholderText("🔍 Search scripts...")
+        self.txt_search.setStyleSheet("background-color: #252526; color: #d4d4d4; border: 1px solid #3e3e42; padding: 4px; border-radius: 4px;")
+        self.txt_search.setFixedWidth(200)
+        self.txt_search.textChanged.connect(self.filter_scripts)
+        toolbar.addWidget(self.txt_search)
+
+        self.btn_run = QPushButton("▶ Run")
+        self.btn_run.setStyleSheet("background-color: #2da44e; color: white; border: none; font-weight: bold;")
+        self.btn_run.clicked.connect(self.run_script)
+        toolbar.addWidget(self.btn_run)
 
         self.btn_new = QPushButton("+ New Script")
         self.btn_new.setObjectName("ActionBtn")
@@ -205,16 +200,29 @@ class ScriptLibrary(QMainWindow):
         splitter.addWidget(self.tabs)
 
 
-        # Right: Editor
+        # Right: Editor & Output Splitter
+        right_splitter = QSplitter(Qt.Orientation.Vertical)
+        
         self.editor = QPlainTextEdit()
         self.editor.setPlaceholderText("Select or create a script to begin writing...")
-        splitter.addWidget(self.editor)
+        right_splitter.addWidget(self.editor)
         
+        # Console Output
+        self.output_console = QPlainTextEdit()
+        self.output_console.setPlaceholderText("Console Output...")
+        self.output_console.setReadOnly(True)
+        self.output_console.setStyleSheet("font-family: 'Consolas', monospace; font-size: 12px; background-color: #0a0a0a; color: #cccccc;")
+        self.output_console.setFixedHeight(150)
+        right_splitter.addWidget(self.output_console)
+        
+        splitter.addWidget(right_splitter)
+
         # Initialize Highlighter
-        self.highlighter = PythonHighlighter(self.editor.document())
+        self.highlighter = UniversalHighlighter(self.editor.document())
 
         splitter.setCollapsible(0, False)
         splitter.setCollapsible(1, False)
+        splitter.setStretchFactor(1, 1) # Give editor more space
         main_layout.addWidget(splitter)
 
         # Load Data
@@ -289,10 +297,18 @@ class ScriptLibrary(QMainWindow):
         self.list_auto.clear()
         
         for name in sorted(self.scripts_data.keys()):
+            # Filter logic
+            search_text = self.txt_search.text().lower()
+            if search_text and search_text not in name.lower():
+                continue
+
             if name.startswith("auto_") or name.startswith("genesis_"):
                 self.list_auto.addItem(name)
             else:
                 self.list_user.addItem(name)
+
+    def filter_scripts(self):
+        self.refresh_lists()
 
 
     def save_data(self):
@@ -377,11 +393,7 @@ class ScriptLibrary(QMainWindow):
         self.apply_highlighting(new_lang)
 
     def apply_highlighting(self, language):
-        if language == "Python":
-            self.highlighter.enabled = True
-        else:
-            self.highlighter.enabled = False
-        self.highlighter.rehighlight()
+        self.highlighter.set_language(language)
 
     def save_current_script(self):
         if self.current_script:
@@ -427,6 +439,98 @@ class ScriptLibrary(QMainWindow):
             self.ai_window.show()
         except ImportError as e:
             QMessageBox.warning(self, "Error", f"Could not import 'src.ai.assistant'.\n{e}")
+
+    def run_script(self):
+        if not self.current_script: return
+        
+        content = self.editor.toPlainText()
+        if not content.strip(): return
+        
+        lang = self.combo_lang.currentText()
+        
+        self.output_console.clear()
+        self.output_console.appendHtml(f"<b>Running ({lang})...</b><br>")
+        
+        import tempfile
+        import subprocess
+        
+        try:
+            creationflags = 0x08000000 if os.name == 'nt' else 0
+            
+            if lang == "Python":
+                fd, path = tempfile.mkstemp(suffix=".py", text=True)
+                with os.fdopen(fd, 'w') as tmp:
+                    tmp.write(content)
+                
+                cmd = [sys.executable, path]
+                self._execute_process(cmd, path) # Refactored common exec
+                
+            elif lang == "Java":
+                # Java needs a class file. We need to find class name or force Main.
+                # Regex to find 'public class X'
+                match = QRegularExpression(r"public\s+class\s+(\w+)").match(content)
+                class_name = match.captured(1) if match.hasMatch() else "Main"
+                
+                # Make a temp dir
+                temp_dir = tempfile.mkdtemp()
+                java_file = os.path.join(temp_dir, f"{class_name}.java")
+                
+                with open(java_file, 'w') as f:
+                    f.write(content)
+                    
+                # Compile
+                self.output_console.appendHtml("<i>Compiling...</i>")
+                compile_proc = subprocess.run(
+                    ["javac", java_file], 
+                    capture_output=True, text=True, creationflags=creationflags
+                )
+                
+                if compile_proc.returncode != 0:
+                    self.output_console.appendHtml(f"<span style='color: #ff5555'>Compilation Failed:</span>")
+                    self.output_console.appendPlainText(compile_proc.stderr)
+                    shutil.rmtree(temp_dir)
+                    return
+                
+                # Run
+                cmd = ["java", "-cp", temp_dir, class_name]
+                self._execute_process(cmd, temp_dir, is_dir=True)
+                
+            else:
+                self.output_console.appendPlainText("Language not supported for execution.")
+
+        except Exception as e:
+            self.output_console.appendHtml(f"<b style='color: #ff5555'>Execution Error (System): {e}</b>")
+
+    def _execute_process(self, cmd, resource_path, is_dir=False):
+        import subprocess
+        creationflags = 0x08000000 if os.name == 'nt' else 0
+        
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            creationflags=creationflags
+        )
+        
+        stdout, stderr = process.communicate()
+        
+        if stdout:
+            self.output_console.appendPlainText(stdout)
+        if stderr:
+             self.output_console.appendHtml(f"<span style='color: #ff5555'>{stderr}</span>")
+        
+        if process.returncode == 0:
+             self.output_console.appendHtml("<br><b style='color: #2da44e'>Finished Successfully</b>")
+        else:
+             self.output_console.appendHtml(f"<br><b style='color: #ff5555'>Finished with Exit Code {process.returncode}</b>")
+             
+        # Cleanup
+        if not is_dir and os.path.exists(resource_path):
+            os.remove(resource_path)
+        elif is_dir and os.path.exists(resource_path):
+            import shutil
+            shutil.rmtree(resource_path)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

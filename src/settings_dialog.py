@@ -1,15 +1,24 @@
-
 import os
 import shutil
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, 
                              QPushButton, QHBoxLayout, QFileDialog, QMessageBox,
-                             QTabWidget, QWidget, QCheckBox, QSpinBox, QComboBox)
+                             QTabWidget, QWidget, QCheckBox, QSpinBox, QComboBox,
+                             QFormLayout)
 from PyQt6.QtCore import Qt
 
+# Try Import ThemeManager safely
+try:
+    from src.themes import ThemeManager
+except ImportError as e:
+    print(f"Error importing ThemeManager in settings_dialog: {e}")
+    ThemeManager = None
+
 class SettingsDialog(QDialog):
-    def __init__(self, config_manager, parent=None):
+    def __init__(self, config_manager, parent=None, apply_callback=None):
+        print("SettingsDialog.__init__ started")
         super().__init__(parent)
         self.config_manager = config_manager
+        self.apply_callback = apply_callback
         self.setWindowTitle("Settings")
         self.resize(600, 400)
         self.setModal(True)
@@ -43,9 +52,13 @@ class SettingsDialog(QDialog):
         self.tabs = QTabWidget()
         layout.addWidget(self.tabs)
         
+        print("Creating tabs...")
         self.create_general_tab()
+        print("General tab created.")
         self.create_appearance_tab()
+        print("Appearance tab created.")
         self.create_behavior_tab()
+        print("Behavior tab created.")
 
         # Footer Buttons
         btn_layout = QHBoxLayout()
@@ -61,6 +74,7 @@ class SettingsDialog(QDialog):
         btn_layout.addWidget(self.btn_cancel)
         
         layout.addLayout(btn_layout)
+        print("SettingsDialog.__init__ finished")
 
     def create_general_tab(self):
         tab = QWidget()
@@ -93,17 +107,48 @@ class SettingsDialog(QDialog):
         tab = QWidget()
         layout = QVBoxLayout(tab)
         
+        form_layout = QFormLayout()
+        
         # Theme
         lbl_theme = QLabel("Theme:")
         self.combo_theme = QComboBox()
-        self.combo_theme.addItems(["Dark", "Light (Coming Soon)"])
+        
+        # Load themes dynamically
+        if ThemeManager:
+            theme_names = list(ThemeManager.THEMES.keys())
+            self.combo_theme.addItems(theme_names)
+        else:
+            self.combo_theme.addItem("Dark") # Fallback
+            
+        self.combo_theme.currentIndexChanged.connect(self.trigger_live_update)
+        
         current_theme = self.config_manager.get_theme()
         index = self.combo_theme.findText(current_theme)
         if index >= 0:
             self.combo_theme.setCurrentIndex(index)
-        layout.addWidget(lbl_theme)
-        layout.addWidget(self.combo_theme)
+        else:
+            default_index = self.combo_theme.findText("Dark")
+            if default_index >= 0: self.combo_theme.setCurrentIndex(default_index)
+
+        # Grid Style
+        lbl_grid = QLabel("Grid Style:")
+        self.combo_grid = QComboBox()
+        self.combo_grid.addItems(["Lines", "Dots"])
         
+        current_grid = self.config_manager.get_grid_style()
+        idx_grid = self.combo_grid.findText(current_grid)
+        if idx_grid >= 0: self.combo_grid.setCurrentIndex(idx_grid)
+
+        # Gradient
+        self.chk_gradient = QCheckBox("Enable UI Gradients")
+        self.chk_gradient.setChecked(self.config_manager.is_gradient_enabled())
+        self.chk_gradient.stateChanged.connect(self.trigger_live_update)
+
+        form_layout.addRow(lbl_theme, self.combo_theme)
+        form_layout.addRow(lbl_grid, self.combo_grid)
+        form_layout.addRow("", self.chk_gradient)
+
+        layout.addLayout(form_layout)
         layout.addStretch()
         self.tabs.addTab(tab, "Appearance")
 
@@ -136,6 +181,27 @@ class SettingsDialog(QDialog):
             full_path = os.path.join(folder, "genesis_data.json")
             self.txt_path.setText(full_path)
 
+    def trigger_live_update(self):
+        """Applies settings immediately to the open window."""
+        # 1. Update Config in memory (persistence handled on Save)
+        # Actually, for "Live", we might need to persist or at least set the config 
+        # so the callback (which likely calls config.get_theme()) sees the new value.
+        # Let's set it. Cancellation reverting is out of scope for now unless we add it.
+        
+        theme = self.combo_theme.currentText()
+        self.config_manager.set("theme", theme)
+        
+        use_gradient = self.chk_gradient.isChecked()
+        self.config_manager.set_gradient_enabled(use_gradient)
+        
+        # 2. Trigger Callback
+        if self.apply_callback:
+            self.apply_callback()
+            
+        # 3. Update Self (Dialog) Style
+        if ThemeManager:
+            self.setStyleSheet(ThemeManager.get_stylesheet(theme, use_gradient))
+
     def save_settings(self):
         # 1. Data Path
         new_path = self.txt_path.text()
@@ -158,11 +224,15 @@ class SettingsDialog(QDialog):
             self.config_manager.set("data_path", new_path)
             path_changed = True
 
-        # 2. Appearance
+        # 2. Appearance -- Already set by live update, but ensures saving to file
         theme = self.combo_theme.currentText()
-        if "Light" in theme: theme = "Light" # Handle "(Coming Soon)"
-        else: theme = "Dark"
         self.config_manager.set("theme", theme)
+        
+        grid_style = self.combo_grid.currentText()
+        self.config_manager.set("grid_style", grid_style)
+
+        use_gradient = self.chk_gradient.isChecked()
+        self.config_manager.set_gradient_enabled(use_gradient)
 
         # 3. Behavior
         self.config_manager.set("hover_persistence", self.chk_hover.isChecked())

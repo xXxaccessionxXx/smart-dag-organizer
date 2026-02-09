@@ -1,6 +1,7 @@
-
 import os
 import json
+import shutil
+from src.themes import ThemeManager
 
 class ConfigManager:
     def __init__(self, config_file="config.json"):
@@ -66,3 +67,18 @@ class ConfigManager:
 
     def get_auto_save_interval(self):
         return self.get("auto_save_interval", 300)
+
+    def get_grid_style(self):
+        return self.get("grid_style", "Lines") # Options: Lines, Dots
+
+    def get_theme_data(self):
+        from src.themes import ThemeManager
+        theme_name = self.get_theme()
+        t = ThemeManager.get_theme(theme_name)
+        return t
+
+    def is_gradient_enabled(self):
+        return self.get("use_gradient", False)
+
+    def set_gradient_enabled(self, enabled):
+        self.set("use_gradient", enabled)
