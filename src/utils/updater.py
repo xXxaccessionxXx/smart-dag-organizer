@@ -62,16 +62,18 @@ class UpdateManager:
 
     def restart_and_install(self):
         """
-        Creates a batch script to replace files and restart the application.
+        Creates a batch script to replace files and restart the application,
+        handling UAC elevation if necessary.
         """
         try:
             exe_path = sys.executable
             app_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
             
-            # If running from source (python.exe), app_dir is the script dir
             # If frozen (exe), app_dir is the dir containing the exe
+            if getattr(sys, 'frozen', False):
+                app_dir = os.path.dirname(exe_path)
             
-            # We need to extract the zip to a temporary folder
+            # Extract to temp
             extract_dir = os.path.join(tempfile.gettempdir(), "SmartDAG_Update_Extracted")
             if os.path.exists(extract_dir):
                 import shutil
@@ -81,8 +83,7 @@ class UpdateManager:
             with zipfile.ZipFile(self.download_path, 'r') as zip_ref:
                 zip_ref.extractall(extract_dir)
                 
-            # Locate the inner folder if it exists (SmartDAGOrganizer/...)
-            # The portable zip usually has a root folder "SmartDAGOrganizer"
+            # Locate source content
             source_dir = extract_dir
             if os.path.exists(os.path.join(extract_dir, "SmartDAGOrganizer")):
                 source_dir = os.path.join(extract_dir, "SmartDAGOrganizer")
@@ -90,49 +91,91 @@ class UpdateManager:
             # Create Batch Script
             batch_script = os.path.join(tempfile.gettempdir(), "update_installer.bat")
             
-            # Check if we are running as a frozen exe or python script
-            is_frozen = getattr(sys, 'frozen', False)
-            
-            launch_cmd = f'"{exe_path}"'
-            if not is_frozen:
-                # If python script, we need to relaunch the script
-                # Assuming main.py or launcher.py is the entry point
+            # Determine launch command
+            if getattr(sys, 'frozen', False):
+                launch_cmd = f'""{exe_path}""' # Double quotes for batch
+            else:
                 script_path = os.path.abspath(sys.argv[0])
-                launch_cmd = f'"{exe_path}" "{script_path}"'
+                launch_cmd = f'""{exe_path}"" ""{script_path}""'
             
-            # Batch contents:
-            # 1. Wait for PID to close
-            # 2. XCOPY /E /Y /I source_dir destination_dir
-            # 3. Start application
-            # 4. Delete temp files
+            # Batch Content
+            # 1. Wait for PID (we pass PID to script)
+            # 2. XCOPY
+            # 3. Relaunch
             
-            # Using timeout /t 2 to give app time to close
-            
+            # We use a loop to wait for the file to be writable (app closed)
             batch_content = f"""
 @echo off
 title Updating Smart DAG Organizer...
 echo Waiting for application to close...
-timeout /t 3 /nobreak > NUL
 
-echo Updating files from {source_dir} to {app_dir}...
+:WAIT_LOOP
+timeout /t 1 /nobreak > NUL
+tasklist /FI "PID eq {os.getpid()}" 2>NUL | find /I /N "{os.getpid()}" >NUL
+if "%ERRORLEVEL%"=="0" goto WAIT_LOOP
+
+echo Updating files...
 xcopy "{source_dir}" "{app_dir}" /E /Y /I /Q
 
-echo Update complete. Restarting...
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] Failed to copy files. Please run as Administrator.
+    pause
+    exit /b %ERRORLEVEL%
+)
+
+echo Update complete.
+echo Restarting application...
 start "" {launch_cmd}
 
 echo Cleaning up...
 del "{self.download_path}"
-del "{batch_script}"
-exit
-            """
+(goto) 2>nul & del "%~f0"
+"""
             
             with open(batch_script, "w") as f:
                 f.write(batch_content)
                 
             print(f"Update script created at {batch_script}")
-            print("Launching update script and exiting...")
             
-            subprocess.Popen([batch_script], shell=True)
+            # Execute with ShellExecute to allow UAC elevation if needed
+            # We use "runas" verb if we suspect we need admin, or just always try to elevate if purely replacing?
+            # Actually, standard user might not need elevation if installed in AppData.
+            # But prompt says "requires me to install portable file", implying failure.
+            # Let's try to run it. If it fails, the batch script pauses (in my code below I removed pause but adding it back might be good for debugging, but we want auto).
+            
+            # Better approach: Use ShellExecute to run the batch script.
+            # On Windows, .bat files need 'cmd /c' or just shell=True.
+            
+            import ctypes
+            from ctypes import wintypes
+            
+            # We will use ShellExecuteW to run the batch file.
+            # passing "runas" triggers UAC prompt if needed, or if the user settings require it.
+            # However, for simply running a batch in temp, we don't strictly need runas UNLESS the xcopy target is protected.
+            # It's safer to request elevation for the update script to ensure xcopy works on Program Files.
+            
+            params = ""
+            show_cmd = 1 # SW_SHOWNORMAL
+            
+            # If we are not admin, and we might need it (we don't check strict permissions here to keep it simple, 
+            # but xcopy to Program Files DEFINITELY needs it).
+            # Let's execute with 'runas' to be safe for the updater.
+            
+            ret = ctypes.windll.shell32.ShellExecuteW(
+                None, 
+                "runas", 
+                batch_script, 
+                params, 
+                None, 
+                show_cmd
+            )
+            
+            if ret <= 32:
+                # Error happened (ret <= 32 is error)
+                # But if user declined UAC, it might be one of these.
+                print(f"ShellExecute failed with code {ret}")
+                pass
+            
             sys.exit(0)
             
         except Exception as e:
