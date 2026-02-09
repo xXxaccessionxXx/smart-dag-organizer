@@ -1160,17 +1160,9 @@ class SmartNode(QGraphicsRectItem):
 
 # --- 4. The Main Window ---
 class SmartWorkflowOrganizer(QMainWindow):
-    update_available = pyqtSignal(str, str, str) # version, url, notes
 
     def __init__(self):
         super().__init__()
-        
-        # Connect Update Signal
-        self.update_available.connect(self.show_update_notification)
-        
-        # Start Background Check
-        import threading
-        threading.Thread(target=self.run_update_check, daemon=True).start()
 
         # Set Window Icon
         try:
@@ -1725,32 +1717,7 @@ class SmartWorkflowOrganizer(QMainWindow):
         for node in self.nodes:
             node.check_status()
 
-    def run_update_check(self):
-        try:
-            from src.utils.updater import UpdateManager
-            from src.version import UPDATE_JSON_URL
-            
-            updater = UpdateManager(UPDATE_JSON_URL)
-            has_update, new_ver, url, notes = updater.check_for_updates()
-            
-            if has_update:
-                self.update_available.emit(new_ver, url, notes)
-        except Exception as e:
-            print(f"Update check failed: {e}")
 
-    def show_update_notification(self, new_version, url, notes):
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Update Available 🚀")
-        msg.setText(f"A new version of Smart DAG Organizer is available!\n\nVersion: {new_version}\n\n{notes}")
-        msg.setIcon(QMessageBox.Icon.Information)
-        
-        btn_download = msg.addButton("Download Update", QMessageBox.ButtonRole.AcceptRole)
-        msg.addButton("Later", QMessageBox.ButtonRole.RejectRole)
-        
-        msg.exec()
-        
-        if msg.clickedButton() == btn_download:
-            QDesktopServices.openUrl(QUrl(url))
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

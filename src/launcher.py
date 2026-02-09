@@ -1,6 +1,7 @@
 import sys
 import os
 import ctypes
+import time
 
 # --- Safe Import Logic ---
 def show_error_and_exit(missing_module):
@@ -15,9 +16,9 @@ def show_error_and_exit(missing_module):
 
 try:
     from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, 
-                                 QWidget, QLabel, QPushButton, QMessageBox)
-    from PyQt6.QtCore import Qt
-    from PyQt6.QtGui import QFont, QColor, QIcon
+                                 QWidget, QLabel, QPushButton, QMessageBox, QProgressDialog)
+    from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
+    from PyQt6.QtGui import QIcon, QFont, QColor
     try:
         from src.utils.assets import resource_path
     except ImportError:
@@ -26,8 +27,7 @@ except ImportError:
     show_error_and_exit("PyQt6")
 
 # --- Import your existing tool ---
-# This requires your previous script to be named 'workflow_organizer.py'
-# Ensure current directory is in path (fixes issues when running from other directories)
+# Ensure current directory is in path
 if os.getcwd() not in sys.path:
     sys.path.append(os.getcwd())
 
@@ -36,6 +36,8 @@ try:
     from script_library import ScriptLibrary
     from src.ai.assistant import NeuralAssistant
     from config_manager import ConfigManager
+    from src.version import UPDATE_JSON_URL, APP_VERSION
+    from src.utils.updater import UpdateManager
 except ImportError as e:
     SmartWorkflowOrganizer = None
     ScriptLibrary = None
@@ -43,6 +45,40 @@ except ImportError as e:
     ConfigManager = None
     print(f"Import Error: {e}")
 
+# --- WORKER THREADS ---
+class UpdateCheckThread(QThread):
+    finished = pyqtSignal(bool, str, str, str) # has_update, version, url, notes
+
+    def run(self):
+        try:
+            updater = UpdateManager(UPDATE_JSON_URL)
+            has_update, new_ver, url, notes = updater.check_for_updates()
+            self.finished.emit(has_update, new_ver, url, notes)
+        except Exception as e:
+            print(f"Update check failed: {e}")
+            self.finished.emit(False, "", "", "")
+
+class DownloadThread(QThread):
+    progress = pyqtSignal(int)
+    finished = pyqtSignal(bool)
+
+    def __init__(self, updater, url):
+        super().__init__()
+        self.updater = updater
+        self.url = url
+
+    def run(self):
+        try:
+            success = self.updater.download_update(self.url, self.report_progress)
+            self.finished.emit(success)
+        except Exception as e:
+            print(f"Download error: {e}")
+            self.finished.emit(False)
+
+    def report_progress(self, percent):
+        self.progress.emit(percent)
+
+# --- MAIN LAUNCHER ---
 class GenesisLauncher(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -63,7 +99,7 @@ class GenesisLauncher(QMainWindow):
         # Central Layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        # Use Grid Layout for Hub Design
+        
         from PyQt6.QtWidgets import QGridLayout
         layout = QGridLayout(central_widget)
         layout.setSpacing(20)
@@ -73,7 +109,7 @@ class GenesisLauncher(QMainWindow):
         title = QLabel("PROJECT GENESIS")
         title.setStyleSheet("font-size: 48px; font-weight: bold; letter-spacing: 4px; color: white;") 
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title, 0, 0, 1, 2) # Span 2 columns
+        layout.addWidget(title, 0, 0, 1, 2) 
         
         subtitle = QLabel("Select a module to begin")
         subtitle.setStyleSheet("font-size: 18px; margin-bottom: 40px; color: #aaaaaa;") 
@@ -81,7 +117,6 @@ class GenesisLauncher(QMainWindow):
         layout.addWidget(subtitle, 1, 0, 1, 2)
 
         # --- Buttons Section (Grid) ---
-        # Helper to create big buttons
         def create_card_button(text, icon, callback):
             btn = QPushButton(f"{icon}\n\n{text}")
             btn.setFixedSize(250, 180)
@@ -113,36 +148,32 @@ class GenesisLauncher(QMainWindow):
         self.btn_ai = create_card_button("Neural Assistant", "🤖", self.launch_assistant)
         layout.addWidget(self.btn_ai, 3, 0)
 
-        # 4. Settings / Toggle
-        # Grouping Settings and Toggle for the 4th slot? Or just Toggle?
-        # Let's make the 4th slot a "System" card that toggles AI or opens Settings?
-        # For now, sticking to the plan: Toggle AI. 
-        # But wait, we need Settings access too! 
-        # Let's add a small settings button in corner, and use 4th slot for Toggle AI?
-        
+        # 4. Toggle AI
         self.btn_toggle = create_card_button("Enable AI", "⚡", self.toggle_ai)
         layout.addWidget(self.btn_toggle, 3, 1)
 
         # Footer
-        footer = QLabel("System v2.0 | Ready")
-        footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        footer.setStyleSheet("font-size: 12px; color: #666; margin-top: 20px;")
-        layout.addWidget(footer, 4, 0, 1, 2)
+        self.lbl_footer = QLabel(f"System v{APP_VERSION} | Checking for updates...")
+        self.lbl_footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_footer.setStyleSheet("font-size: 12px; color: #888; margin-top: 20px;")
+        layout.addWidget(self.lbl_footer, 4, 0, 1, 2)
         
-        # Center the grid in the window
+        # Center the grid
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.btn_ai_ref = self.btn_ai # Keep ref for updates
+        self.btn_ai_ref = self.btn_ai
         self.update_ui_state()
         
         self.animate_fade_in()
 
+        # Start Update Check
+        QTimer.singleShot(1500, self.start_update_check)
+
     def animate_fade_in(self):
         try:
             from PyQt6.QtCore import QPropertyAnimation, QEasingCurve
-            
-            # Opacity Effect
             from PyQt6.QtWidgets import QGraphicsOpacityEffect
+            
             self.opacity_effect = QGraphicsOpacityEffect(self)
             self.setGraphicsEffect(self.opacity_effect)
             
@@ -155,6 +186,55 @@ class GenesisLauncher(QMainWindow):
         except ImportError:
             pass
 
+    # --- UPDATE LOGIC ---
+    def start_update_check(self):
+        self.update_thread = UpdateCheckThread()
+        self.update_thread.finished.connect(self.on_update_checked)
+        self.update_thread.start()
+
+    def on_update_checked(self, has_update, version, url, notes):
+        if has_update:
+            self.lbl_footer.setText(f"System v{APP_VERSION} | Update Available: v{version}")
+            self.lbl_footer.setStyleSheet("font-size: 12px; color: #00cc66; font-weight: bold; margin-top: 20px;")
+            
+            msg = f"A new version ({version}) is available!\n\nRelease Notes:\n{notes}\n\nDo you want to update now?"
+            reply = QMessageBox.question(self, "Update Available", msg, 
+                                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                self.perform_update(url)
+        else:
+            self.lbl_footer.setText(f"System v{APP_VERSION} | Up to date")
+
+    def perform_update(self, url):
+        self.progress_dlg = QProgressDialog("Downloading update...", "Cancel", 0, 100, self)
+        self.progress_dlg.setWindowModality(Qt.WindowModality.WindowModal)
+        self.progress_dlg.setMinimumDuration(0)
+        self.progress_dlg.setValue(0)
+        
+        updater = UpdateManager(UPDATE_JSON_URL)
+        
+        self.download_thread = DownloadThread(updater, url)
+        self.download_thread.progress.connect(self.progress_dlg.setValue)
+        self.download_thread.finished.connect(lambda success: self.on_download_finished(success, updater))
+        self.download_thread.start()
+
+    def on_download_finished(self, success, updater):
+        if success:
+            self.progress_dlg.setLabelText("Installing update...")
+            self.progress_dlg.setValue(100)
+            # Give UI a moment to show 100%
+            QTimer.singleShot(500, lambda: self.finalize_update(updater))
+        else:
+            self.progress_dlg.close()
+            QMessageBox.critical(self, "Update Failed", "Failed to download the update.\nPlease check your internet connection.")
+
+    def finalize_update(self, updater):
+        self.progress_dlg.close()
+        # This will restart the app
+        updater.restart_and_install()
+
+    # --- LAUNCHERS ---
     def launch_workflow(self):
         try:
             from src.workflow_organizer import SmartWorkflowOrganizer
@@ -216,62 +296,11 @@ class GenesisLauncher(QMainWindow):
             self.btn_ai_ref.setText(f"🤖\n\nNeural Assistant\n{' (Active)' if enabled else ' (Inactive)'}")
             self.btn_toggle.setText(f"⚡\n\n{'Disable' if enabled else 'Enable'} AI")
             
-            # Update style to reflect state
             if enabled:
-                # Default style is already set in create_card_button
                 pass 
             else:
                  self.btn_ai_ref.setStyleSheet("QPushButton { background-color: rgba(30, 30, 30, 0.5); color: #555; border: 2px dashed #444; border-radius: 12px; font-size: 18px; font-weight: bold; }")
 
-    def check_updates(self):
-        """Checks for updates in the background."""
-        try:
-            from src.version import UPDATE_JSON_URL
-            from src.utils.updater import UpdateManager
-            
-            self.updater = UpdateManager(UPDATE_JSON_URL) 
-            
-            # Run check in a separate thread to avoid freezing UI? 
-            # For simplicity in this step, we'll do it synchronously but arguably it should be async.
-            # Expected to be fast check.
-            
-            # TODO: threading this would be better.
-            has_update, new_ver, download_url, notes = self.updater.check_for_updates()
-            
-            if has_update:
-                msg = f"A new version ({new_ver}) is available!\n\nRelease Notes:\n{notes}\n\nDo you want to update now?"
-                reply = QMessageBox.question(self, "Update Available", msg, 
-                                             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-                
-                if reply == QMessageBox.StandardButton.Yes:
-                    self.perform_update(download_url)
-                    
-        except Exception as e:
-            print(f"Update check failed: {e}")
-
-    def perform_update(self, url):
-        from PyQt6.QtWidgets import QProgressDialog
-        
-        progress = QProgressDialog("Downloading update...", "Cancel", 0, 100, self)
-        progress.setWindowModality(Qt.WindowModality.WindowModal)
-        progress.show()
-        
-        def update_progress(p):
-            progress.setValue(p)
-            QApplication.processEvents() # Keep UI responsive
-            
-        success = self.updater.download_update(url, progress_callback=update_progress)
-        
-        if success:
-            progress.setLabelText("Installing update...")
-            progress.setValue(100)
-            # This will close the app
-            self.updater.restart_and_install()
-        else:
-            QMessageBox.critical(self, "Update Failed", "Failed to download the update.")
-            progress.close()
-
-# --- Entry Point ---
 if __name__ == "__main__":
     from src.utils.logger import CrashHandler
     CrashHandler.setup()
@@ -279,11 +308,5 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     window = GenesisLauncher()
-    
-    # Check for updates after show
-    # Using QTimer to let the window show first
-    from PyQt6.QtCore import QTimer
-    QTimer.singleShot(2000, window.check_updates)
-    
     window.show()
     sys.exit(app.exec())
