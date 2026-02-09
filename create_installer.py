@@ -21,7 +21,7 @@ def create_installer():
     if os.path.exists("build"):
         shutil.rmtree("build")
         
-    run_command("pyinstaller main.spec")
+    run_command(f'"{sys.executable}" -m PyInstaller main.spec')
 
     # 2. Create Payload Zip
     print("\n[2/4] Creating Payload Zip...")
@@ -63,7 +63,7 @@ def create_installer():
     # --icon: Icon for the setup exe
     
     setup_cmd = (
-        f'pyinstaller --noconfirm --onefile --windowed --name "SmartDAG_Setup" '
+        f'"{sys.executable}" -m PyInstaller --noconfirm --onefile --windowed --name "SmartDAG_Setup" '
         f'--add-data "{payload_zip};." '
     )
     

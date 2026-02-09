@@ -82,3 +82,9 @@ class ConfigManager:
 
     def set_gradient_enabled(self, enabled):
         self.set("use_gradient", enabled)
+
+    def get_window_geometry(self):
+        return self.get("window_geometry", None)
+
+    def set_window_geometry(self, geometry_hex):
+        self.set("window_geometry", geometry_hex)

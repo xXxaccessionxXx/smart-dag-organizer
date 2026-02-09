@@ -274,14 +274,14 @@ class SmartLine(QGraphicsLineItem):
         if not self.start_node.scene() or not self.end_node.scene():
             return
 
-        start_pos = self.start_node.scenePos()
-        end_pos = self.end_node.scenePos()
+        # Use boundingRect center for dynamic positioning
+        start_rect = self.start_node.boundingRect()
+        end_rect = self.end_node.boundingRect()
         
-        offset_x = 100 
-        offset_y = 40
-        source_point = start_pos + QPointF(offset_x, offset_y)
-        dest_point = end_pos + QPointF(offset_x, offset_y)
-        self.setLine(QLineF(source_point, dest_point))
+        start_center = self.start_node.mapToScene(start_rect.center())
+        end_center = self.end_node.mapToScene(end_rect.center())
+        
+        self.setLine(QLineF(start_center, end_center))
 
 # --- 3a. Note Popup Class ---
 class NotePopup(QGraphicsProxyWidget):
@@ -1186,6 +1186,14 @@ class SmartWorkflowOrganizer(QMainWindow):
 
         self.setWindowTitle("Project Genesis - Workflow Organizer")
         self.resize(1200, 800) 
+        
+        # Restore Window State
+        saved_geometry = self.config_manager.get_window_geometry()
+        if saved_geometry:
+            try:
+                self.restoreGeometry(bytes.fromhex(saved_geometry))
+            except Exception:
+                pass # Invalid geometry data 
 
         # Load Path from Config
         self.save_file_path = self.config_manager.get_data_path()
@@ -1344,6 +1352,12 @@ class SmartWorkflowOrganizer(QMainWindow):
     def return_to_launcher(self):
         self.save_current_pipeline_to_memory()
         self.save_to_disk()
+        
+        # Save Window State
+        if self.normalGeometry().isValid(): # Don't save if minimized/maximized weirdness
+             self.config_manager.set_window_geometry(self.saveGeometry().toHex().data().decode())
+
+        try:
         try:
             from launcher import GenesisLauncher
             self.launcher = GenesisLauncher()
@@ -1364,6 +1378,13 @@ class SmartWorkflowOrganizer(QMainWindow):
             self.ai_window.show()
         except ImportError as e:
             QMessageBox.warning(self, "Error", f"Could not import 'src.ai.assistant'.\n{e}")
+
+    def closeEvent(self, event):
+        # Save Window State on Close
+        if self.normalGeometry().isValid():
+             self.config_manager.set_window_geometry(self.saveGeometry().toHex().data().decode())
+             
+        super().closeEvent(event)
 
     # --- FOCUS LOGIC ---
     def focus_camera_on_nodes(self):
