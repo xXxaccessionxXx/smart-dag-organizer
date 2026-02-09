@@ -133,13 +133,21 @@ def create_installer():
             # Git Commands
             commit_msg = input("Enter commit message (default: 'Update: New Release'): ").strip()
             if not commit_msg:
-                commit_msg = "Update: New Release"
+                commit_msg = f"Release {new_ver}"
                 
             print("Pushing to GitHub...")
             run_command("git add .")
             run_command(f'git commit -m "{commit_msg}"')
-            run_command("git push origin master") # Assuming master, could detect branch
-            print("\n[Success] Pushed to GitHub!")
+            run_command("git push origin master")
+            
+            # Push Tag to trigger GitHub Action
+            tag_name = f"v{new_ver}"
+            print(f"Pushing tag {tag_name} to trigger release build...")
+            run_command(f"git tag {tag_name}")
+            run_command(f"git push origin {tag_name}")
+            
+            print("\n[Success] Pushed code and tag to GitHub!")
+            print("[Info] GitHub Action will now build the release and upload artifacts.")
             
         except Exception as e:
             print(f"\n[Error] Release automation failed: {e}")
