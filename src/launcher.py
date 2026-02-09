@@ -223,6 +223,54 @@ class GenesisLauncher(QMainWindow):
             else:
                  self.btn_ai_ref.setStyleSheet("QPushButton { background-color: rgba(30, 30, 30, 0.5); color: #555; border: 2px dashed #444; border-radius: 12px; font-size: 18px; font-weight: bold; }")
 
+    def check_updates(self):
+        """Checks for updates in the background."""
+        try:
+            from src.version import UPDATE_JSON_URL
+            from src.utils.updater import UpdateManager
+            
+            self.updater = UpdateManager(UPDATE_JSON_URL) 
+            
+            # Run check in a separate thread to avoid freezing UI? 
+            # For simplicity in this step, we'll do it synchronously but arguably it should be async.
+            # Expected to be fast check.
+            
+            # TODO: threading this would be better.
+            has_update, new_ver, download_url, notes = self.updater.check_for_updates()
+            
+            if has_update:
+                msg = f"A new version ({new_ver}) is available!\n\nRelease Notes:\n{notes}\n\nDo you want to update now?"
+                reply = QMessageBox.question(self, "Update Available", msg, 
+                                             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                
+                if reply == QMessageBox.StandardButton.Yes:
+                    self.perform_update(download_url)
+                    
+        except Exception as e:
+            print(f"Update check failed: {e}")
+
+    def perform_update(self, url):
+        from PyQt6.QtWidgets import QProgressDialog
+        
+        progress = QProgressDialog("Downloading update...", "Cancel", 0, 100, self)
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.show()
+        
+        def update_progress(p):
+            progress.setValue(p)
+            QApplication.processEvents() # Keep UI responsive
+            
+        success = self.updater.download_update(url, progress_callback=update_progress)
+        
+        if success:
+            progress.setLabelText("Installing update...")
+            progress.setValue(100)
+            # This will close the app
+            self.updater.restart_and_install()
+        else:
+            QMessageBox.critical(self, "Update Failed", "Failed to download the update.")
+            progress.close()
+
 # --- Entry Point ---
 if __name__ == "__main__":
     from src.utils.logger import CrashHandler
@@ -231,5 +279,11 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     window = GenesisLauncher()
+    
+    # Check for updates after show
+    # Using QTimer to let the window show first
+    from PyQt6.QtCore import QTimer
+    QTimer.singleShot(2000, window.check_updates)
+    
     window.show()
     sys.exit(app.exec())
