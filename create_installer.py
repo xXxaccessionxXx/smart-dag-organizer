@@ -67,8 +67,8 @@ def create_installer():
         f'--add-data "{payload_zip};." '
     )
     
-    if os.path.exists("assets/icon.bmp"):
-        setup_cmd += f' --icon "assets/icon.bmp" '
+    if os.path.exists("assets/icon.ico"):
+        setup_cmd += f' --icon "assets/icon.ico" '
         
     setup_cmd += f'"src/setup_wizard.py"'
     

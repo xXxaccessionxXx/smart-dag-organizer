@@ -27,7 +27,7 @@ jobs:
 
     - name: Create Dummy Icon (If missing)
       run: |
-        if not exist assets\icon.bmp (
+        if not exist assets\icon.ico (
             echo Creating dummy icon...
             python create_dummy_icon.py
         )
