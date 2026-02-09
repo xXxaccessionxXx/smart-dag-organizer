@@ -5,7 +5,7 @@ import zipfile
 import shutil
 import subprocess
 from PyQt6.QtWidgets import (QApplication, QWizard, QWizardPage, QVBoxLayout, QLabel, 
-                             QProgressBar, QMessageBox, QCheckBox)
+                             QProgressBar, QMessageBox, QCheckBox, QWidget, QHBoxLayout)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QIcon, QPixmap
 
@@ -114,36 +114,152 @@ class InstallThread(QThread):
         except Exception as e:
             self.finished_signal.emit(False, str(e))
 
+class Theme:
+    # Modern Dark Theme Palette
+    BG_COLOR = "#2D2D30"
+    FG_COLOR = "#FFFFFF"
+    ACCENT = "#007acc"
+    ACCENT_HOVER = "#0062a3"
+    SECONDARY_BG = "#3e3e42"
+    BORDER = "#555555"
+    
+    STYLESHEET = f"""
+        QWizard {{
+            background-color: {BG_COLOR};
+            color: {FG_COLOR};
+        }}
+        QWizardPage {{
+            background-color: {BG_COLOR};
+            color: {FG_COLOR};
+        }}
+        QLabel {{
+            color: {FG_COLOR};
+            font-size: 14px;
+        }}
+        QLabel#Title {{
+            font-size: 24px;
+            font-weight: bold;
+            color: {ACCENT};
+            margin-bottom: 20px;
+        }}
+        QLabel#Subtitle {{
+            font-size: 16px;
+            color: #dddddd;
+            margin-bottom: 10px;
+        }}
+        QProgressBar {{
+            border: 2px solid {BORDER};
+            border-radius: 5px;
+            text-align: center;
+            background-color: {SECONDARY_BG};
+            color: {FG_COLOR};
+            font-weight: bold;
+        }}
+        QProgressBar::chunk {{
+            background-color: {ACCENT};
+            width: 20px;
+        }}
+        QPushButton {{
+            background-color: {ACCENT};
+            color: {FG_COLOR};
+            border: none;
+            border-radius: 4px;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: bold;
+        }}
+        QPushButton:hover {{
+            background-color: {ACCENT_HOVER};
+        }}
+        QPushButton:disabled {{
+            background-color: {SECONDARY_BG};
+            color: #888888;
+        }}
+        QCheckBox {{
+            color: {FG_COLOR};
+            font-size: 14px;
+            spacing: 8px;
+        }}
+        QCheckBox::indicator {{
+            width: 18px;
+            height: 18px;
+            border: 1px solid {BORDER};
+            background: {SECONDARY_BG};
+            border-radius: 3px;
+        }}
+        QCheckBox::indicator:checked {{
+            background-color: {ACCENT};
+            border: 1px solid {ACCENT};
+        }}
+    """
+
 class IntroPage(QWizardPage):
     def __init__(self):
         super().__init__()
-        self.setTitle(f"Welcome to the {APP_NAME} Setup")
-        
+        self.setTitle("") # Hide default title, use custom layout
+        self.setSubTitle("") 
+
         layout = QVBoxLayout()
-        label = QLabel(f"This wizard will install {APP_NAME} on your computer.\n\n"
-                       f"Destination: {INSTALL_DIR}\n\n"
-                       "Click Next to continue.")
-        label.setWordWrap(True)
-        layout.addWidget(label)
+        layout.setSpacing(20)
+        layout.setContentsMargins(40, 40, 40, 40)
+        
+        # Custom Title
+        title = QLabel(f"Welcome to {APP_NAME}")
+        title.setObjectName("Title")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+        
+        # Description
+        desc = QLabel(f"This wizard will guide you through the installation of {APP_NAME}.\n\n"
+                      f"Destination: {INSTALL_DIR}\n\n"
+                      "Click 'Next' to begin.")
+        desc.setWordWrap(True)
+        desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        desc.setStyleSheet("font-size: 16px; line-height: 1.5;")
+        layout.addWidget(desc)
+        
+        layout.addStretch()
+        
+        # Note
+        note = QLabel("Note: This software is provided as-is. Please report any issues on GitHub.")
+        note.setStyleSheet("color: #888888; font-style: italic; font-size: 12px;")
+        note.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(note)
+        
         self.setLayout(layout)
 
 class InstallPage(QWizardPage):
     def __init__(self):
         super().__init__()
-        self.setTitle("Installing...")
-        self.setCommitPage(True) # Removes Cancel/Back once started
+        self.setTitle("")
+        self.setSubTitle("")
+        self.setCommitPage(True) 
         
         layout = QVBoxLayout()
-        self.status_label = QLabel("Ready to install...")
+        layout.setSpacing(30)
+        layout.setContentsMargins(50, 50, 50, 50)
+        
+        # Header
+        header = QLabel("Installing...")
+        header.setObjectName("Title")
+        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(header)
+        
+        # Status
+        self.status_label = QLabel("Initializing...")
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status_label.setStyleSheet("font-size: 16px; color: #aaaaaa;")
         layout.addWidget(self.status_label)
         
+        # Progress Bar
         self.pbar = QProgressBar()
+        self.pbar.setFixedHeight(30)
         layout.addWidget(self.pbar)
         
+        layout.addStretch()
         self.setLayout(layout)
         
     def initializePage(self):
-        # Start installation automatically when entering this page
         self.start_install()
 
     def start_install(self):
@@ -155,28 +271,71 @@ class InstallPage(QWizardPage):
 
     def on_finished(self, success, message):
         if success:
-            self.status_label.setText("Installation Successful!")
+            self.status_label.setText("Success!")
             self.pbar.setValue(100)
+            # Auto-advance after short delay? Or just let user click next.
+            # QTimer.singleShot(1000, self.wizard().next)
             self.wizard().next()
         else:
-            self.status_label.setText(f"Error: {message}")
-            QMessageBox.critical(self, "Installation Failed", message)
+            self.status_label.setText("Installation Failed")
+            self.status_label.setStyleSheet("color: #ff5555; font-weight: bold; font-size: 18px;")
+            QMessageBox.critical(self, "Error", message)
 
 class FinishPage(QWizardPage):
     def __init__(self):
         super().__init__()
-        self.setTitle("Installation Complete")
+        self.setTitle("")
+        self.setSubTitle("")
         
         layout = QVBoxLayout()
-        layout.addWidget(QLabel(f"{APP_NAME} has been successfully installed."))
+        layout.setSpacing(20)
+        layout.setContentsMargins(40, 40, 40, 40)
+        
+        # Header
+        header = QLabel("Installation Complete")
+        header.setObjectName("Title")
+        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(header)
+        
+        # Icon/Checkmark placeholder (text for now)
+        check = QLabel("✔")
+        check.setStyleSheet("font-size: 60px; color: #4caf50; margin: 10px;")
+        check.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(check)
+        
+        desc = QLabel(f"{APP_NAME} has been successfully installed on your computer.")
+        desc.setWordWrap(True)
+        desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(desc)
+        
+        layout.addSpacing(20)
+        
+        # Options container for alignment
+        opts_layout = QVBoxLayout()
+        opts_layout.setSpacing(10)
         
         self.chk_launch = QCheckBox(f"Launch {APP_NAME}")
         self.chk_launch.setChecked(True)
-        layout.addWidget(self.chk_launch)
+        self.chk_launch.setCursor(Qt.CursorShape.PointingHandCursor)
+        opts_layout.addWidget(self.chk_launch)
         
         self.chk_desktop = QCheckBox("Create Desktop Shortcut")
         self.chk_desktop.setChecked(True)
-        layout.addWidget(self.chk_desktop)
+        self.chk_desktop.setCursor(Qt.CursorShape.PointingHandCursor)
+        opts_layout.addWidget(self.chk_desktop)
+        
+        # Center options
+        container = QWidget()
+        container.setLayout(opts_layout)
+        container.setFixedWidth(300)
+        
+        h_layout = QHBoxLayout()
+        h_layout.addStretch()
+        h_layout.addWidget(container)
+        h_layout.addStretch()
+        
+        layout.addLayout(h_layout)
+        layout.addStretch()
         
         self.setLayout(layout)
 
@@ -184,12 +343,11 @@ class FinishPage(QWizardPage):
         # Create Shortcuts
         exe_path = os.path.join(INSTALL_DIR, "SmartDAGOrganizer", EXE_NAME)
         if not os.path.exists(exe_path):
-             exe_path = os.path.join(INSTALL_DIR, EXE_NAME) # Check root if dist structure differs
+             exe_path = os.path.join(INSTALL_DIR, EXE_NAME)
 
         if self.chk_desktop.isChecked():
             self.create_shortcut(exe_path, "Desktop")
             
-        # Create Start Menu Shortcut (Always)
         self.create_shortcut(exe_path, "StartMenu")
 
         # Launch
@@ -205,24 +363,18 @@ class FinishPage(QWizardPage):
         try:
             import winshell
             from win32com.client import Dispatch
-            
             shell = Dispatch('WScript.Shell')
-            
             if location_type == "Desktop":
                 location = shell.SpecialFolders("Desktop")
             else:
                 location = shell.SpecialFolders("StartMenu")
-                
             shortcut_path = os.path.join(location, f"{APP_NAME}.lnk")
-            
             shortcut = shell.CreateShortCut(shortcut_path)
             shortcut.TargetPath = target
             shortcut.WorkingDirectory = os.path.dirname(target)
             shortcut.IconLocation = target
             shortcut.save()
-            
         except ImportError:
-            # Fallback using VBScript if pywin32 not installed
              self.create_shortcut_vbs(target, location_type)
 
     def create_shortcut_vbs(self, target, location_type):
@@ -244,17 +396,30 @@ class SetupWizard(QWizard):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"{APP_NAME} Setup")
-        self.setFixedSize(600, 400)
+        self.setFixedSize(700, 500)
         
+        # Apply Theme
+        self.setStyleSheet(Theme.STYLESHEET)
+        
+        # Wizard Options
+        self.setWizardStyle(QWizard.WizardStyle.ModernStyle)
+        
+        # Hide default logo/watermark to use our custom full-page layouts
+        self.setOption(QWizard.WizardOption.NoDefaultButton, False)
+        
+        # Add Pages
         self.addPage(IntroPage())
         self.addPage(InstallPage())
         self.addPage(FinishPage())
+        
+        # Customize Buttons
+        self.setButtonText(QWizard.WizardButton.NextButton, "Next >")
+        self.setButtonText(QWizard.WizardButton.FinishButton, "Finish & Launch")
+        self.setButtonText(QWizard.WizardButton.CancelButton, "Cancel")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    
-    # Try to verify payload exists before showing UI
-    # but let the UI handle the actual error for better UX
+    app.setStyle("Fusion")
     
     wizard = SetupWizard()
     wizard.show()
