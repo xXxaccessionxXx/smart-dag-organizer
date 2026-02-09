@@ -22,7 +22,7 @@ tests/test_data/
 # Build Artifacts
 build/
 dist/
-*.spec
+# *.spec
 SmartDAG_Portable.zip
 SmartDAG_Setup.exe
 payload.zip
