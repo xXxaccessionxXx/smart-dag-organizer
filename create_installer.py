@@ -150,8 +150,10 @@ def create_installer():
             # Push Tag to trigger GitHub Action
             tag_name = f"v{new_ver}"
             print(f"Pushing tag {tag_name} to trigger release build...")
-            run_command(f"git tag {tag_name}")
-            run_command(f"git push origin {tag_name}")
+            
+            # Use -f to overwrite if it exists locally, and force push to remote
+            run_command(f"git tag -f {tag_name}")
+            run_command(f"git push origin {tag_name} --force")
             
             print("\n[Success] Pushed code and tag to GitHub!")
             print("[Info] GitHub Action will now build the release and upload artifacts.")
