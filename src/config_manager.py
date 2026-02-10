@@ -5,7 +5,9 @@ from src.themes import ThemeManager
 
 class ConfigManager:
     def __init__(self, config_file="config.json"):
-        self.config_file = config_file
+        # Resolve to AppData to prevent CWD pollution (e.g. Desktop)
+        app_data = self.get_app_data_dir()
+        self.config_file = os.path.join(app_data, config_file)
         self.config = {}
         self.load_config()
 
@@ -34,7 +36,7 @@ class ConfigManager:
         self.config[key] = value
         self.save_config()
 
-    def get_data_path(self):
+    def get_app_data_dir(self):
         # Use APPDATA for persistence across updates
         app_data = os.environ.get('APPDATA')
         if not app_data:
@@ -42,7 +44,10 @@ class ConfigManager:
              
         base_dir = os.path.join(app_data, "SmartDAGOrganizer")
         os.makedirs(base_dir, exist_ok=True)
-        
+        return base_dir
+
+    def get_data_path(self):
+        base_dir = self.get_app_data_dir()
         return os.path.join(base_dir, "genesis_data.json")
 
     @staticmethod
