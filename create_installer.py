@@ -5,11 +5,63 @@ import subprocess
 import zipfile
 import sys
 import base64
+import struct
+import os
+
+def generate_ico_powershell(input_path, output_path):
+    try:
+        # PowerShell command to convert to ICO using .NET
+        # We resize to 256x256 first, then convert to Icon
+        ps_script = (
+            f"$path = '{input_path}'; "
+            f"$out = '{output_path}'; "
+            "Add-Type -AssemblyName System.Drawing; "
+            "$img = [System.Drawing.Image]::FromFile($path); "
+            # Resize via Bitmap to ensure standard format
+            "$bmp = new-object System.Drawing.Bitmap($img, 64, 64); "
+            "$hicon = $bmp.GetHicon(); "
+            "$icon = [System.Drawing.Icon]::FromHandle($hicon); " 
+            "$fs = New-Object System.IO.FileStream($out, [System.IO.FileMode]::Create); "
+            "$icon.Save($fs); "
+            "$fs.Close(); "
+            "$icon.Dispose(); $bmp.Dispose(); $img.Dispose(); "
+            "[Runtime.InteropServices.Marshal]::ReleaseComObject($hicon) | Out-Null;" # Cleanup
+        )
+        
+        cmd = ["powershell", "-noprofile", "-command", ps_script]
+        print(f"[Icon] Converting {input_path} to valid ICO via PowerShell...")
+        subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+            return True
+        return False
+    except Exception as e:
+        print(f"[Icon] PowerShell conversion failed: {e}")
+        return False
 
 def generate_ico(filename):
-    print(f"[Icon] Generating valid base64 icon to {filename}...")
-    # Minimal 16x16 16-color valid ICO (Standard Favicon format)
-    # This guarantees compatibility with Windows UpdateResourceW
+    print(f"[Icon] Generating icon to {filename}...")
+    
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    original_png = os.path.join(base_dir, "assets", "acyclic.PNG")
+    
+    # Strategy:
+    # 1. Try PowerShell System.Drawing conversion (Highest compatibility for Windows API)
+    # 2. Fallback to standard base64 icon
+    
+    if os.path.exists(original_png):
+        print(f"[Icon] Found source: {original_png}")
+        if generate_ico_powershell(original_png, filename):
+             print(f"[Icon] Success! Created {filename}")
+             return
+        else:
+             print("[Icon] Conversion failed. Using fallback.")
+    else:
+         print(f"[Icon] Source image not found at {original_png}")
+
+    # Fallback
+    print(f"[Icon] Using fallback standard icon.")
+    # Standard 16x16 valid ICO base64
     valid_ico_b64 = (
         "AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAA"
         "/4DAAN8BAAD/AAAA/wAAAO8AAAD3AAAA5wAAAOcAAAD3AAAA7wAAAP8AAAD/AAAA3wEAAP+AwAD/gMAA/4DAAP+AwAA="
@@ -19,7 +71,7 @@ def generate_ico(filename):
     with open(filename, 'wb') as f:
         f.write(base64.b64decode(valid_ico_b64))
         
-    print(f"[Icon] Generated {filename}")
+    print(f"[Icon] Generated fallback {filename}")
 
 
 def run_command(cmd):
@@ -31,8 +83,10 @@ def create_installer():
     print("   Smart DAG Organizer - Installer Builder")
     print("="*60)
     
-    # Ensure Icon Exists
-    generate_ico("assets/icon.ico")
+
+    # Ensure Icon Exists (v2 to bypass locks)
+    icon_file = "assets/icon_v2.ico"
+    generate_ico(icon_file)
 
     # 0. Sync with Remote
     print("\n[0/5] Syncing with Remote...")
@@ -51,7 +105,31 @@ def create_installer():
     if os.path.exists("build"):
         shutil.rmtree("build")
         
+    # Update main.spec if needed (simple sed-like replace in memory?)
+    # Or just pass --icon to PyInstaller?
+    # main.spec defines the icon. We should update main.spec or rely on PyInstaller overriding it?
+    # PyInstaller's EXE step takes icon.
+    # main.spec has `icon='assets\\icon.ico'` or similar.
+    # checking main.spec content...
+    
+    # Let's just update main.spec dynamically
+    spec_path = "main.spec"
+    with open(spec_path, "r") as f:
+        spec_content = f.read()
+    
+    if "icon='assets\\\\icon.ico'" in spec_content:
+        spec_content = spec_content.replace("icon='assets\\\\icon.ico'", f"icon='{icon_file.replace('/', '\\\\')}'")
+        with open(spec_path, "w") as f:
+            f.write(spec_content)
+            
+    # Also check for single backslash
+    if "icon='assets\\icon.ico'" in spec_content:
+        spec_content = spec_content.replace("icon='assets\\icon.ico'", f"icon='{icon_file.replace('/', '\\\\')}'")
+        with open(spec_path, "w") as f:
+            f.write(spec_content)
+
     run_command(f'"{sys.executable}" -m PyInstaller main.spec')
+
 
     # 2. Create Payload Zip
     print("\n[2/4] Creating Payload Zip...")
@@ -97,8 +175,8 @@ def create_installer():
         f'--add-data "{payload_zip};." '
     )
     
-    if os.path.exists("assets/icon.ico"):
-        setup_cmd += f' --icon "assets/icon.ico" '
+    if os.path.exists("assets/icon_v2.ico"):
+        setup_cmd += f' --icon "assets/icon_v2.ico" '
         
     setup_cmd += f'"src/setup_wizard.py"'
     
