@@ -519,9 +519,7 @@ class SmartNode(QGraphicsRectItem):
         btn_color = theme["text_dim"] if "text_dim" in theme else "#cccccc"
         self.collapse_btn.setDefaultTextColor(QColor(btn_color))
         self.collapse_btn.setFont(QFont("Arial", 14))
-        self.collapse_btn.setFont(QFont("Arial", 14))
         
-        # Initial sizing
         # Initial sizing
         self.adjust_size()
         
@@ -1282,6 +1280,52 @@ class SmartWorkflowOrganizer(QMainWindow):
         
         self.animate_fade_in()
 
+        # First Run Check
+        QTimer.singleShot(100, self.check_first_run)
+        
+        # Register Crash Callback (specific to this window instance)
+        from src.utils.logger import CrashHandler
+        CrashHandler.register_save_callback(self.emergency_save)
+
+    def emergency_save(self):
+        """Called by CrashHandler."""
+        try:
+            self.save_current_pipeline_to_memory()
+            self.save_to_disk()
+        except:
+            pass
+
+    def check_first_run(self):
+        """Checks if there are no pipelines and prompts for a project name."""
+        if len(self.pipelines_data) <= 1 and not self.pipelines_data.get("Default Project", {}).get("nodes"):
+             # It seems empty, or just default.
+             # Let's check if we just loaded the default empty one.
+             if list(self.pipelines_data.keys()) == ["Default Project"]:
+                 self.prompt_initial_project_name()
+
+    def prompt_initial_project_name(self):
+        name, ok = QInputDialog.getText(self, "Welcome!", "Let's name your first project:")
+        if ok and name:
+            # Rename Default Project
+            self.pipelines_data[name] = self.pipelines_data.pop("Default Project")
+            self.current_pipeline_name = name
+            
+            self.combo_pipelines.blockSignals(True)
+            self.combo_pipelines.clear()
+            self.combo_pipelines.addItem(name)
+            self.combo_pipelines.setCurrentText(name)
+            self.combo_pipelines.blockSignals(False)
+            
+            self.save_to_disk()
+
+    # --- SAVE HELPER ---
+    def trigger_autosave(self):
+        """Autosaves if interval or critical action."""
+        # For now, we save on every structural change as requested by 'unwanted loss' fear, 
+        # but locally (to memory/disk).
+        self.save_current_pipeline_to_memory()
+        self.save_to_disk()
+
     def animate_fade_in(self):
         try:
             from PyQt6.QtCore import QPropertyAnimation, QEasingCurve
@@ -1371,6 +1415,10 @@ class SmartWorkflowOrganizer(QMainWindow):
             QMessageBox.warning(self, "Error", f"Could not import 'src.ai.assistant'.\n{e}")
 
     def closeEvent(self, event):
+        # Save Data
+        self.save_current_pipeline_to_memory()
+        self.save_to_disk()
+
         # Save Window State on Close
         if self.normalGeometry().isValid():
              self.config_manager.set_window_geometry(self.saveGeometry().toHex().data().decode())
@@ -1643,8 +1691,15 @@ class SmartWorkflowOrganizer(QMainWindow):
         return node
 
     def add_new_node_center(self):
-        center = self.view.mapToScene(self.view.viewport().rect().center())
-        self.add_node("New Task", center.x() - 100, center.y() - 40)
+        try:
+            center = self.view.mapToScene(self.view.viewport().rect().center())
+            self.add_node("New Task", center.x() - 100, center.y() - 40)
+            self.trigger_autosave()
+        except Exception as e:
+            print(f"Error adding node: {e}")
+            import traceback
+            traceback.print_exc()
+            QMessageBox.warning(self, "Error", f"Could not create node: {e}")
 
     def connect_selected_nodes(self):
         selected_items = self.scene.selectedItems()
@@ -1683,6 +1738,8 @@ class SmartWorkflowOrganizer(QMainWindow):
         
         # Send behind nodes
         line.setZValue(-1) 
+        
+        self.trigger_autosave()
         return line
 
     def delete_node(self, node):
@@ -1694,6 +1751,7 @@ class SmartWorkflowOrganizer(QMainWindow):
         if node in self.nodes:
             self.nodes.remove(node)
         self.update_progress()
+        self.trigger_autosave()
 
     def remove_line(self, line):
         if line in self.lines:
@@ -1704,6 +1762,7 @@ class SmartWorkflowOrganizer(QMainWindow):
             line.start_node.connected_lines.remove(line)
         if line.end_node and line in line.end_node.connected_lines:
             line.end_node.connected_lines.remove(line)
+        self.trigger_autosave()
 
     def delete_selected_items(self):
         selected = self.scene.selectedItems()

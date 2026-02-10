@@ -58,6 +58,9 @@ if __name__ == "__main__":
         app = QApplication(sys.argv)
         app.setStyle("Fusion")
         
+        # Register app.save_data as a crash callback to ensure data is saved on unexpected exits
+        CrashHandler.add_callback(app.save_data)
+
         # Ensure launcher applies theme globally
         window = GenesisLauncher()
         window.show()

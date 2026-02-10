@@ -11,7 +11,7 @@ from PyQt6.QtGui import QIcon, QPixmap
 
 # Constants
 APP_NAME = "Smart DAG Organizer"
-INSTALL_DIR = os.path.join(os.environ['LOCALAPPDATA'], "SmartDAGOrganizer")
+# INSTALL_DIR is now calculated dynamically to ensure it picks up the USER's home dir, not the builder's.
 EXE_NAME = "SmartDAGOrganizer.exe"
 
 def resource_path(relative_path):
@@ -31,6 +31,9 @@ class InstallThread(QThread):
 
     def run(self):
         try:
+            # Dynamic Install Dir
+            install_dir = os.path.join(os.path.expanduser("~"), "AppData", "Local", "SmartDAGOrganizer")
+            
             zip_path = resource_path("payload.zip")
             
             if not os.path.exists(zip_path):
@@ -46,20 +49,20 @@ class InstallThread(QThread):
             backup_dir = os.path.join(tempfile.gettempdir(), "SmartDAG_Backup")
             has_backup = False
             
-            if os.path.exists(INSTALL_DIR):
+            if os.path.exists(install_dir):
                 try:
                     if os.path.exists(backup_dir):
                         shutil.rmtree(backup_dir)
                     os.makedirs(backup_dir)
                     
                     # Backup 'data' folder
-                    data_src = os.path.join(INSTALL_DIR, "data")
+                    data_src = os.path.join(install_dir, "data")
                     if os.path.exists(data_src):
                         shutil.copytree(data_src, os.path.join(backup_dir, "data"))
                         has_backup = True
                         
                     # Backup 'config.json'
-                    config_src = os.path.join(INSTALL_DIR, "config.json")
+                    config_src = os.path.join(install_dir, "config.json")
                     if os.path.exists(config_src):
                         shutil.copy2(config_src, backup_dir)
                         has_backup = True
@@ -69,20 +72,20 @@ class InstallThread(QThread):
             # --- DATA PRESERVATION END ---
 
             self.status.emit("Cleaning up old files...")
-            if os.path.exists(INSTALL_DIR):
+            if os.path.exists(install_dir):
                 try:
-                    shutil.rmtree(INSTALL_DIR)
+                    shutil.rmtree(install_dir)
                 except Exception as e:
                     self.finished_signal.emit(False, f"Could not clean directory: {e}")
                     return
             
-            os.makedirs(INSTALL_DIR, exist_ok=True)
+            os.makedirs(install_dir, exist_ok=True)
 
             self.status.emit("Extracting files...")
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 total_files = len(zip_ref.infolist())
                 for i, file in enumerate(zip_ref.infolist()):
-                    zip_ref.extract(file, INSTALL_DIR)
+                    zip_ref.extract(file, install_dir)
                     self.progress.emit(int((i / total_files) * 90))
             
             # --- DATA RESTORE START ---
@@ -92,14 +95,14 @@ class InstallThread(QThread):
                     # Restore 'data' folder (Overwrite templates)
                     backup_data = os.path.join(backup_dir, "data")
                     if os.path.exists(backup_data):
-                        target_data = os.path.join(INSTALL_DIR, "data")
+                        target_data = os.path.join(install_dir, "data")
                         # shutil.copytree with dirs_exist_ok=True (Python 3.8+)
                         shutil.copytree(backup_data, target_data, dirs_exist_ok=True)
                         
                     # Restore 'config.json'
                     backup_config = os.path.join(backup_dir, "config.json")
                     if os.path.exists(backup_config):
-                        shutil.copy2(backup_config, os.path.join(INSTALL_DIR, "config.json"))
+                        shutil.copy2(backup_config, os.path.join(install_dir, "config.json"))
                         
                     # Cleanup backup
                     shutil.rmtree(backup_dir)
@@ -209,9 +212,11 @@ class IntroPage(QWizardPage):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
         
+        dest_path = os.path.join(os.path.expanduser("~"), "AppData", "Local", "SmartDAGOrganizer")
+        
         # Description
         desc = QLabel(f"This wizard will guide you through the installation of {APP_NAME}.\n\n"
-                      f"Destination: {INSTALL_DIR}\n\n"
+                      f"Destination: {dest_path}\n\n"
                       "Click 'Next' to begin.")
         desc.setWordWrap(True)
         desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -340,10 +345,13 @@ class FinishPage(QWizardPage):
         self.setLayout(layout)
 
     def validatePage(self):
+        # Recalculate dynamic path
+        install_dir = os.path.join(os.path.expanduser("~"), "AppData", "Local", "SmartDAGOrganizer")
+        
         # Create Shortcuts
-        exe_path = os.path.join(INSTALL_DIR, "SmartDAGOrganizer", EXE_NAME)
+        exe_path = os.path.join(install_dir, "SmartDAGOrganizer", EXE_NAME)
         if not os.path.exists(exe_path):
-             exe_path = os.path.join(INSTALL_DIR, EXE_NAME)
+             exe_path = os.path.join(install_dir, EXE_NAME)
 
         if self.chk_desktop.isChecked():
             self.create_shortcut(exe_path, "Desktop")
@@ -385,8 +393,10 @@ class FinishPage(QWizardPage):
         oLink.TargetPath = "{target}"
         oLink.WorkingDirectory = "{os.path.dirname(target)}"
         oLink.Save
+        oLink.Save
         """
-        vbs_path = os.path.join(INSTALL_DIR, "create_shortcut.vbs")
+        install_dir = os.path.join(os.path.expanduser("~"), "AppData", "Local", "SmartDAGOrganizer")
+        vbs_path = os.path.join(install_dir, "create_shortcut.vbs")
         with open(vbs_path, "w") as f:
             f.write(vbs_script)
         subprocess.call(['cscript', '//Nologo', vbs_path])

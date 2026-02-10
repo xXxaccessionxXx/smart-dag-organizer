@@ -35,15 +35,15 @@ class ConfigManager:
         self.save_config()
 
     def get_data_path(self):
-        # Default to 'data/genesis_data.json' relative to CWD if not set
-        default_path = os.path.join("data", "genesis_data.json")
-        path = self.get("data_path", default_path)
+        # Use APPDATA for persistence across updates
+        app_data = os.environ.get('APPDATA')
+        if not app_data:
+             app_data = os.path.expanduser("~")
+             
+        base_dir = os.path.join(app_data, "SmartDAGOrganizer")
+        os.makedirs(base_dir, exist_ok=True)
         
-        # Ensure directory exists if it's the default one
-        if path == default_path:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            
-        return path
+        return os.path.join(base_dir, "genesis_data.json")
 
     @staticmethod
     def _get_shared_instance():
