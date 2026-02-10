@@ -167,7 +167,7 @@ class GenesisLauncher(QMainWindow):
         self.animate_fade_in()
 
         # Start Update Check
-        QTimer.singleShot(1500, self.start_update_check)
+        QTimer.singleShot(100, self.start_update_check)
 
     def animate_fade_in(self):
         try:
