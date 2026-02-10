@@ -9,110 +9,65 @@ import struct
 import os
 
 def generate_ico(filename):
-    print(f"[Icon] Generating icon to {filename}...")
+    print(f"[Icon] Generating icon to {filename} using Pillow...")
     
     base_dir = os.path.dirname(os.path.abspath(__file__))
     original_png = os.path.join(base_dir, "assets", "acyclic.PNG")
-    
-    # 1. Native PowerShell Conversion (Best Quality)
-    # Tries to create a proper multi-size ICO or at least valid header via .NET
-    ps_native_script = (
-        f"$path = '{original_png}'; "
-        f"$out = '{filename}'; "
-        "Add-Type -AssemblyName System.Drawing; "
-        "$img = [System.Drawing.Image]::FromFile($path); "
-        "$bmp = new-object System.Drawing.Bitmap($img, 64, 64); " # 64x64 base
-        "$hicon = $bmp.GetHicon(); "
-        "$icon = [System.Drawing.Icon]::FromHandle($hicon); " 
-        "$fs = New-Object System.IO.FileStream($out, [System.IO.FileMode]::Create); "
-        "$icon.Save($fs); "
-        "$fs.Close(); "
-        "$icon.Dispose(); $bmp.Dispose(); $img.Dispose(); "
-        "[Runtime.InteropServices.Marshal]::ReleaseComObject($hicon) | Out-Null;"
+
+    try:
+        from PIL import Image
+        if os.path.exists(original_png):
+            img = Image.open(original_png)
+            # Create high-quality multi-size ICO
+            # Include 256x256, 128x128, 64x64, 48x48, 32x32, 16x16
+            # This ensures crisp rendering at all scales and avoids "Single Image" issues.
+            icon_sizes = [(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)]
+            img.save(filename, format='ICO', sizes=icon_sizes)
+            print(f"[Icon] Successfully created multi-size ICO: {filename}")
+            return
+        else:
+            print(f"[Icon] Source image not found: {original_png}")
+
+    except ImportError:
+        print("[Icon] Pillow (PIL) not installed. Please run: pip install Pillow")
+        print("[Icon] Attempting fallback (PowerShell)...")
+        # Native PowerShell Fallback (Single size 64x64)
+        ps_native_script = (
+            f"$path = '{original_png}'; "
+            f"$out = '{filename}'; "
+            "Add-Type -AssemblyName System.Drawing; "
+            "$img = [System.Drawing.Image]::FromFile($path); "
+            "$bmp = new-object System.Drawing.Bitmap($img, 64, 64); "
+            "$hicon = $bmp.GetHicon(); "
+            "$icon = [System.Drawing.Icon]::FromHandle($hicon); " 
+            "$fs = New-Object System.IO.FileStream($out, [System.IO.FileMode]::Create); "
+            "$icon.Save($fs); "
+            "$fs.Close(); "
+            "$icon.Dispose(); $bmp.Dispose(); $img.Dispose(); "
+            "[Runtime.InteropServices.Marshal]::ReleaseComObject($hicon) | Out-Null;"
+        )
+        try:
+             subprocess.check_call(["powershell", "-noprofile", "-command", ps_native_script], 
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+             if os.path.exists(filename) and os.path.getsize(filename) > 100:
+                 print("[Icon] PowerShell fallback successful.")
+                 return
+        except: pass
+
+    except Exception as e:
+        print(f"[Icon] Generation failed: {e}")
+
+    # Ultimate Fallback
+    print(f"[Icon] Using emergency fallback standard icon.")
+    valid_ico_b64 = (
+        "AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAA"
+        "/4DAAN8BAAD/AAAA/wAAAO8AAAD3AAAA5wAAAOcAAAD3AAAA7wAAAP8AAAD/AAAA3wEAAP+AwAD/gMAA/4DAAP+AwAA="
     )
     
-    print("[Icon] Attempting native PowerShell conversion...")
-    try:
-        cmd = ["powershell", "-noprofile", "-command", ps_native_script]
-        subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception as e:
-        print(f"[Icon] Native conversion failed: {e}")
-
-    # Check validity (Native sometimes produces empty files in headless envs)
-    native_success = False
-    if os.path.exists(filename) and os.path.getsize(filename) > 1000: # >1KB means likely valid
-        print("[Icon] Native conversion successful.")
-        native_success = True
-    else:
-        print("[Icon] Native conversion produced invalid file (too small).")
-    
-    if not native_success:
-        print("[Icon] Falling back to Manual PNG Wrapping (48x48)...")
-        # 2. Manual PNG Wrapping (Robust Fallback)
-        # Use 48x48 PNG - very standard size, less likely to trigger WinError 87 than 256
-        target_size = 48
-        resized_png = os.path.join(base_dir, "assets", f"icon_{target_size}.png")
-        
-        # Resize first
-        if os.path.exists(original_png):
-            ps_resize_script = (
-                f"$path = '{original_png}'; "
-                f"$out = '{resized_png}'; "
-                "Add-Type -AssemblyName System.Drawing; "
-                "$img = [System.Drawing.Image]::FromFile($path); "
-                f"$new = new-object System.Drawing.Bitmap({target_size},{target_size}); "
-                "$g = [System.Drawing.Graphics]::FromImage($new); "
-                "$g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic; "
-                f"$g.DrawImage($img, 0, 0, {target_size}, {target_size}); "
-                "$new.Save($out, [System.Drawing.Imaging.ImageFormat]::Png); "
-                "$img.Dispose(); $new.Dispose(); $g.Dispose();"
-            )
-            try:
-                subprocess.check_call(["powershell", "-noprofile", "-command", ps_resize_script], 
-                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            except: pass
-            
-        source_png = resized_png if os.path.exists(resized_png) else original_png
-        
-        if os.path.exists(source_png):
-            try:
-                with open(source_png, "rb") as f:
-                    png_data = f.read()
-                
-                # Check dimensions if possible or assume from target_size if resized
-                # 48x48
-                ico_header = struct.pack('<HHI', 0, 1, 1)
-                
-                # If using original (huge), these bytes might be wrong, but we tried resizing.
-                # Assuming 48x48 for directory entry
-                w_byte = 48
-                h_byte = 48
-                bpp = 32
-                img_size = len(png_data)
-                offset = 6 + 16
-                
-                dir_entry = struct.pack('<BBBBHHII', 
-                    w_byte, h_byte, 0, 0, 1, bpp, img_size, offset
-                )
-                
-                with open(filename, 'wb') as f:
-                    f.write(ico_header)
-                    f.write(dir_entry)
-                    f.write(png_data)
-                print(f"[Icon] Created manual ICO from {source_png}")
-            except Exception as e:
-                print(f"[Icon] Manual creation failed: {e}")
-
-    # 3. Last Resort Fallback
-    if not os.path.exists(filename) or os.path.getsize(filename) == 0:
-        print(f"[Icon] Using emergency fallback icon.")
-        valid_ico_b64 = (
-            "AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAA"
-            "/4DAAN8BAAD/AAAA/wAAAO8AAAD3AAAA5wAAAOcAAAD3AAAA7wAAAP8AAAD/AAAA3wEAAP+AwAD/gMAA/4DAAP+AwAA="
-        )
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
-        with open(filename, 'wb') as f:
-            f.write(base64.b64decode(valid_ico_b64))
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    with open(filename, 'wb') as f:
+        f.write(base64.b64decode(valid_ico_b64))
+    print(f"[Icon] Generated fallback {filename}")
 
 
 def run_command(cmd):
@@ -125,8 +80,8 @@ def create_installer():
     print("="*60)
     
 
-    # Ensure Icon Exists (v2 to bypass locks)
-    icon_file = "assets/icon_final.ico"
+    # Ensure Icon Exists
+    icon_file = "assets/icon.ico"
     generate_ico(icon_file)
 
     # 0. Sync with Remote
@@ -153,21 +108,31 @@ def create_installer():
     # main.spec has `icon='assets\\icon.ico'` or similar.
     # checking main.spec content...
     
-    # Let's just update main.spec dynamically
+    # Safety Check: Ensure icon exists and matches spec expectation
+    if not os.path.exists(icon_file):
+        print(f"[Error] Generated icon {icon_file} not found! Build will fail.")
+        sys.exit(1)
+        
+    # Update main.spec dynamically to ensure it matches
     spec_path = "main.spec"
-    with open(spec_path, "r") as f:
-        spec_content = f.read()
-    
-    if "icon='assets\\\\icon.ico'" in spec_content:
-        spec_content = spec_content.replace("icon='assets\\\\icon.ico'", f"icon='{icon_file.replace('/', '\\\\')}'")
-        with open(spec_path, "w") as f:
-            f.write(spec_content)
-            
-    # Also check for single backslash
-    if "icon='assets\\icon.ico'" in spec_content:
-        spec_content = spec_content.replace("icon='assets\\icon.ico'", f"icon='{icon_file.replace('/', '\\\\')}'")
-        with open(spec_path, "w") as f:
-            f.write(spec_content)
+    if os.path.exists(spec_path):
+        with open(spec_path, "r") as f:
+            spec_content = f.read()
+        
+        # Check for v2 or other legacy names and replace with correct one
+        updated = False
+        if "icon='assets\\\\icon_v2.ico'" in spec_content:
+             print("[Info] Updating main.spec icon path (legacy v2 -> icon.ico)...")
+             spec_content = spec_content.replace("icon='assets\\\\icon_v2.ico'", "icon='assets\\\\icon.ico'")
+             updated = True
+        elif "icon='assets\\icon_v2.ico'" in spec_content:
+             print("[Info] Updating main.spec icon path (legacy v2 -> icon.ico)...")
+             spec_content = spec_content.replace("icon='assets\\icon_v2.ico'", "icon='assets\\icon.ico'")
+             updated = True
+             
+        if updated:
+             with open(spec_path, "w") as f:
+                 f.write(spec_content)
 
     run_command(f'"{sys.executable}" -m PyInstaller main.spec')
 
@@ -216,8 +181,8 @@ def create_installer():
         f'--add-data "{payload_zip};." '
     )
     
-    if os.path.exists("assets/icon_final.ico"):
-        setup_cmd += f' --icon "assets/icon_final.ico" '
+    if os.path.exists("assets/icon.ico"):
+        setup_cmd += f' --icon "assets/icon.ico" '
         
     setup_cmd += f'"src/setup_wizard.py"'
     
