@@ -87,7 +87,7 @@ class GenesisLauncher(QMainWindow):
         
         # Set Window Icon
         try:
-            icon_path = resource_path("assets/icon.bmp")
+            icon_path = resource_path("assets/icon.png")
             if os.path.exists(icon_path):
                 self.setWindowIcon(QIcon(icon_path))
         except Exception:

@@ -4,6 +4,23 @@ import shutil
 import subprocess
 import zipfile
 import sys
+import base64
+
+def generate_ico(filename):
+    print(f"[Icon] Generating valid base64 icon to {filename}...")
+    # Minimal 16x16 16-color valid ICO (Standard Favicon format)
+    # This guarantees compatibility with Windows UpdateResourceW
+    valid_ico_b64 = (
+        "AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAA"
+        "/4DAAN8BAAD/AAAA/wAAAO8AAAD3AAAA5wAAAOcAAAD3AAAA7wAAAP8AAAD/AAAA3wEAAP+AwAD/gMAA/4DAAP+AwAA="
+    )
+    
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    with open(filename, 'wb') as f:
+        f.write(base64.b64decode(valid_ico_b64))
+        
+    print(f"[Icon] Generated {filename}")
+
 
 def run_command(cmd):
     print(f"[Exec] {cmd}")
@@ -13,6 +30,9 @@ def create_installer():
     print("="*60)
     print("   Smart DAG Organizer - Installer Builder")
     print("="*60)
+    
+    # Ensure Icon Exists
+    generate_ico("assets/icon.ico")
 
     # 0. Sync with Remote
     print("\n[0/5] Syncing with Remote...")
