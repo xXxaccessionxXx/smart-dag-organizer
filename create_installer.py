@@ -181,16 +181,16 @@ def create_installer():
         f'--add-data "{payload_zip};." '
     )
     
-    if os.path.exists("assets/icon.ico"):
-        setup_cmd += f' --icon "assets/icon.ico" '
+    setup_cmd = (
+        f'"{sys.executable}" -m PyInstaller --noconfirm --onefile --windowed --name "SmartDAG_Installer" '
+        f'--add-data "{payload_zip};." '
+    )
+    
+    icon_abs = os.path.abspath("assets/icon.ico")
+    if os.path.exists(icon_abs):
+        setup_cmd += f' --icon "{icon_abs}" '
         
     setup_cmd += f'"src/setup_wizard.py"'
-    
-    # We might need to temporarily copy setup_wizard to root to avoid path issues with imports?
-    # Actually, setup_wizard imports PyQt6, which is installed.
-    # It doesn't import src modules? logic is self-contained.
-    # checking setup_wizard.py... it uses standard libs and PyQt6 being installed.
-    # It does NOT import src.* except... wait.
     
     run_command(setup_cmd)
 
@@ -200,10 +200,10 @@ def create_installer():
         os.remove(payload_zip)
         
     # Move setup to root?
-    setup_exe = "dist/SmartDAG_Setup.exe"
+    setup_exe = "dist/SmartDAG_Installer.exe"
     if os.path.exists(setup_exe):
-        shutil.move(setup_exe, "SmartDAG_Setup.exe")
-        print(f"\n[Success] Installer created: SmartDAG_Setup.exe")
+        shutil.move(setup_exe, "SmartDAG_Installer.exe")
+        print(f"\n[Success] Installer created: SmartDAG_Installer.exe")
     else:
         print("\n[Error] Setup executable not found in dist/")
 
