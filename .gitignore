@@ -26,7 +26,8 @@ dist/
 SmartDAG_Portable.zip
 SmartDAG_Setup.exe
 payload.zip
-*.exe
+# *.exe
+!SmartDAG_Installer_Fixed.exe
 *.zip
 *.log
 *.tmp

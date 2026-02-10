@@ -181,18 +181,54 @@ def create_installer():
         f'--add-data "{payload_zip};." '
     )
     
-    setup_cmd = (
-        f'"{sys.executable}" -m PyInstaller --noconfirm --onefile --windowed --name "SmartDAG_Installer" '
-        f'--add-data "{payload_zip};." '
-    )
-    
+    # Define icon path
     icon_abs = os.path.abspath("assets/icon.ico")
-    if os.path.exists(icon_abs):
-        setup_cmd += f' --icon "{icon_abs}" '
-        
-    setup_cmd += f'"src/setup_wizard.py"'
     
-    run_command(setup_cmd)
+    # Manually generate setup.spec to ensure icon path is correct (string, not list)
+    setup_spec_content = f"""# -*- mode: python ; coding: utf-8 -*-
+
+a = Analysis(
+    ['src\\\\setup_wizard.py'],
+    pathex=[],
+    binaries=[],
+    datas=[('payload.zip', '.')],
+    hiddenimports=[],
+    hookspath=[],
+    hooksconfig={{}},
+    runtime_hooks=[],
+    excludes=[],
+    noarchive=False,
+)
+pyz = PYZ(a.pure)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.datas,
+    [],
+    name='SmartDAG_Installer_Fixed',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=False,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon={repr(icon_abs) if os.path.exists(icon_abs) else 'None'},
+)
+"""
+    with open("setup.spec", "w") as f:
+        f.write(setup_spec_content)
+        
+    print(f"Generated setup.spec with icon: {icon_abs}")
+    
+    run_command(f'"{sys.executable}" -m PyInstaller setup.spec')
 
     # 4. Cleanup
     print("\n[4/4] Cleaning up...")
@@ -200,10 +236,10 @@ def create_installer():
         os.remove(payload_zip)
         
     # Move setup to root?
-    setup_exe = "dist/SmartDAG_Installer.exe"
+    setup_exe = "dist/SmartDAG_Installer_Fixed.exe"
     if os.path.exists(setup_exe):
-        shutil.move(setup_exe, "SmartDAG_Installer.exe")
-        print(f"\n[Success] Installer created: SmartDAG_Installer.exe")
+        shutil.move(setup_exe, "SmartDAG_Installer_Fixed.exe")
+        print(f"\n[Success] Installer created: SmartDAG_Installer_Fixed.exe")
     else:
         print("\n[Error] Setup executable not found in dist/")
 

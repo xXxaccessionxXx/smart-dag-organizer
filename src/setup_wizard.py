@@ -353,10 +353,16 @@ class FinishPage(QWizardPage):
         if not os.path.exists(exe_path):
              exe_path = os.path.join(install_dir, EXE_NAME)
 
+        # Define Icon Path
+        icon_path = os.path.join(install_dir, "assets", "icon.ico")
+        if not os.path.exists(icon_path):
+             # Fallback to exe itself
+             icon_path = exe_path
+
         if self.chk_desktop.isChecked():
-            self.create_shortcut(exe_path, "Desktop")
+            self.create_shortcut(exe_path, icon_path, "Desktop")
             
-        self.create_shortcut(exe_path, "StartMenu")
+        self.create_shortcut(exe_path, icon_path, "StartMenu")
 
         # Launch
         if self.chk_launch.isChecked():
@@ -367,9 +373,8 @@ class FinishPage(QWizardPage):
 
         return True
 
-    def create_shortcut(self, target, location_type):
+    def create_shortcut(self, target, icon_path, location_type):
         try:
-            import winshell
             from win32com.client import Dispatch
             shell = Dispatch('WScript.Shell')
             if location_type == "Desktop":
@@ -380,19 +385,26 @@ class FinishPage(QWizardPage):
             shortcut = shell.CreateShortCut(shortcut_path)
             shortcut.TargetPath = target
             shortcut.WorkingDirectory = os.path.dirname(target)
-            shortcut.IconLocation = target
+            if os.path.exists(icon_path):
+                shortcut.IconLocation = icon_path
+            else:
+                shortcut.IconLocation = target
             shortcut.save()
         except ImportError:
-             self.create_shortcut_vbs(target, location_type)
+             self.create_shortcut_vbs(target, icon_path, location_type)
+        except Exception as e:
+             # Even if win32 fails, try VBS
+             self.create_shortcut_vbs(target, icon_path, location_type)
 
-    def create_shortcut_vbs(self, target, location_type):
+    def create_shortcut_vbs(self, target, icon_path, location_type):
+        icon_line = f'oLink.IconLocation = "{icon_path}"' if os.path.exists(icon_path) else ''
         vbs_script = f"""
         Set oWS = WScript.CreateObject("WScript.Shell")
         sLinkFile = oWS.SpecialFolders("{location_type}") & "\{APP_NAME}.lnk"
         Set oLink = oWS.CreateShortcut(sLinkFile)
         oLink.TargetPath = "{target}"
         oLink.WorkingDirectory = "{os.path.dirname(target)}"
-        oLink.Save
+        {icon_line}
         oLink.Save
         """
         install_dir = os.path.join(os.path.expanduser("~"), "AppData", "Local", "SmartDAGOrganizer")
@@ -400,7 +412,8 @@ class FinishPage(QWizardPage):
         with open(vbs_path, "w") as f:
             f.write(vbs_script)
         subprocess.call(['cscript', '//Nologo', vbs_path])
-        os.remove(vbs_path)
+        if os.path.exists(vbs_path):
+            os.remove(vbs_path)
 
 class SetupWizard(QWizard):
     def __init__(self):
