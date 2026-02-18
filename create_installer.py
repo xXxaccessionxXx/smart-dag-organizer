@@ -84,6 +84,12 @@ def update_version():
             current_ver = data.get("version", "1.0.0")
     
     print(f"Current Version: {current_ver}")
+
+    # Check for CI/Build-Only mode to avoid blocking input
+    if "--build-only" in sys.argv or os.environ.get("CI") == "true":
+        print("[Info] Build-Only/CI mode detected. Skipping version prompt.")
+        return current_ver
+
     new_ver = input(f"Enter new version (or press Enter to keep {current_ver}): ").strip()
     
     if new_ver:

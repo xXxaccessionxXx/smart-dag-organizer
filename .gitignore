@@ -33,3 +33,6 @@ payload.zip
 *.zip
 *.log
 *.tmp
+
+# Backups
+_Backup/
