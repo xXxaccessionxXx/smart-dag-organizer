@@ -21,7 +21,8 @@ try:
                                  QPushButton, QGraphicsItem, QGraphicsRectItem, 
                                  QGraphicsTextItem, QGraphicsLineItem, QGraphicsProxyWidget,
                                  QFrame, QTextEdit, QLineEdit, QComboBox, QMessageBox, 
-                                 QFileDialog, QInputDialog, QGraphicsDropShadowEffect, QMenu, QStyle) # Added items
+                                 QFileDialog, QInputDialog, QGraphicsDropShadowEffect, QMenu, QStyle, QColorDialog,
+                                 QTabWidget, QListWidget, QListWidgetItem) # Added Tab widgets
     from PyQt6.QtGui import (QColor, QFont, QPen, QBrush, QAction, QDesktopServices, 
                              QPainter, QCursor, QTransform, QLinearGradient, QPainterPath, QIcon)
     from PyQt6.QtCore import (Qt, QTimer, QLineF, QUrl, QPointF, QRectF, QSizeF, 
@@ -33,6 +34,8 @@ try:
         def resource_path(p): return p
 except ImportError:
     show_error_and_exit("PyQt6")
+
+from src.utils.status_checker import StatusChecker
 
 # --- 1. Custom Graphics View ---
 class SmartView(QGraphicsView):
@@ -290,7 +293,7 @@ class NotePopup(QGraphicsProxyWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setZValue(1000) 
-        self.setAcceptHoverEvents(True) # Crucial for grace period logic
+        self.setAcceptHoverEvents(True) 
         
         # Container Widget
         self.container = QFrame()
@@ -309,6 +312,12 @@ class NotePopup(QGraphicsProxyWidget):
                 font-family: 'Segoe UI';
                 font-size: 11px;
             }
+            QLineEdit {
+                background-color: #1e1e1e;
+                color: #e0e0e0;
+                border: 1px solid #3e3e42;
+                border-radius: 3px;
+            }
             QPushButton {
                 background-color: #0e639c;
                 color: white;
@@ -317,47 +326,114 @@ class NotePopup(QGraphicsProxyWidget):
                 padding: 4px;
             }
             QPushButton:hover { background-color: #1177bb; }
+            QTabWidget::pane { border: none; }
+            QTabBar::tab {
+                background: #2D2D30;
+                color: #888;
+                padding: 5px 10px;
+                border-bottom: 2px solid transparent;
+            }
+            QTabBar::tab:selected {
+                color: white;
+                border-bottom: 2px solid #0e639c;
+            }
+            QListWidget {
+                background-color: #1e1e1e;
+                color: #e0e0e0;
+                border: none;
+            }
         """)
         
-        layout = QVBoxLayout(self.container)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(5)
+        main_layout = QVBoxLayout(self.container)
+        main_layout.setContentsMargins(5, 5, 5, 5)
+        main_layout.setSpacing(5)
         
-        # Title
+        # Header (Common)
         self.lbl_title = QLabel("Node Title")
         self.lbl_title.setStyleSheet("font-weight: bold; font-size: 13px; color: white;")
-        layout.addWidget(self.lbl_title)
+        main_layout.addWidget(self.lbl_title)
         
-        # Type/Path
         self.lbl_info = QLabel("Type: None")
         self.lbl_info.setStyleSheet("color: #888888; font-size: 10px;")
-        layout.addWidget(self.lbl_info)
+        main_layout.addWidget(self.lbl_info)
         
-        # Separator
-        self.line = QFrame()
-        self.line.setFrameShape(QFrame.Shape.HLine)
-        self.line.setStyleSheet("background-color: #454545; max-height: 1px;")
-        layout.addWidget(self.line)
+        # Tabs
+        self.tabs = QTabWidget()
+        main_layout.addWidget(self.tabs)
+        
+        # --- Tab 1: Notes ---
+        self.tab_notes = QWidget()
+        notes_layout = QVBoxLayout(self.tab_notes)
+        notes_layout.setContentsMargins(5, 5, 5, 5)
+        
+        # Toolbar
+        toolbar_layout = QHBoxLayout()
+        toolbar_layout.setContentsMargins(0, 0, 0, 0)
+        toolbar_layout.setSpacing(2)
+        
+        self.btn_bold = QPushButton("B")
+        self.btn_bold.setFixedWidth(25)
+        self.btn_bold.setStyleSheet("font-weight: bold;")
+        self.btn_bold.clicked.connect(self.toggle_bold)
+        toolbar_layout.addWidget(self.btn_bold)
 
-        # Notes Area (Interactive)
+        self.btn_italic = QPushButton("I")
+        self.btn_italic.setFixedWidth(25)
+        self.btn_italic.setStyleSheet("font-style: italic;")
+        self.btn_italic.clicked.connect(self.toggle_italic)
+        toolbar_layout.addWidget(self.btn_italic)
+        
+        self.btn_color = QPushButton("🎨")
+        self.btn_color.setFixedWidth(25)
+        self.btn_color.clicked.connect(self.pick_color)
+        toolbar_layout.addWidget(self.btn_color)
+        
+        toolbar_layout.addStretch()
+        notes_layout.addLayout(toolbar_layout)
+
+        # Notes Area
         self.txt_notes = QTextEdit()
         self.txt_notes.setPlaceholderText("Add notes here...")
-        self.txt_notes.setReadOnly(False) 
-        self.txt_notes.setMaximumHeight(100)
+        self.txt_notes.setMinimumHeight(120)
         self.txt_notes.textChanged.connect(self._on_text_changed)
-        layout.addWidget(self.txt_notes)
+        notes_layout.addWidget(self.txt_notes)
         
         # Image Preview
         self.lbl_image = QLabel()
         self.lbl_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_image.setVisible(False)
-        layout.addWidget(self.lbl_image)
+        notes_layout.addWidget(self.lbl_image)
 
         # Action Buttons
         self.btn_open = QPushButton("🚀 Open Attachment")
         self.btn_open.clicked.connect(self._on_open_clicked)
         self.btn_open.setVisible(False)
-        layout.addWidget(self.btn_open)
+        notes_layout.addWidget(self.btn_open)
+        
+        self.tabs.addTab(self.tab_notes, "Notes")
+        
+        # --- Tab 2: Calendar ---
+        self.tab_calendar = QWidget()
+        cal_layout = QVBoxLayout(self.tab_calendar)
+        cal_layout.setContentsMargins(5, 5, 5, 5)
+        
+        self.list_events = QListWidget()
+        self.list_events.setAlternatingRowColors(True)
+        self.list_events.setEmptyLabel("No upcoming events found.") if hasattr(self.list_events, "setEmptyLabel") else None
+        cal_layout.addWidget(self.list_events)
+        
+        h_cal = QHBoxLayout()
+        self.btn_refresh_cal = QPushButton("🔄 Refresh")
+        self.btn_refresh_cal.clicked.connect(self.refresh_calendar_events)
+        h_cal.addWidget(self.btn_refresh_cal)
+        
+        self.btn_add_event = QPushButton("➕ Add Event")
+        self.btn_add_event.clicked.connect(self.open_add_event_dialog)
+        h_cal.addWidget(self.btn_add_event)
+        
+        cal_layout.addLayout(h_cal)
+        
+        self.tabs.addTab(self.tab_calendar, "Calendar")
 
         self.setWidget(self.container)
         self.setVisible(False)
@@ -370,6 +446,55 @@ class NotePopup(QGraphicsProxyWidget):
         
         self.updating = False
 
+    def refresh_calendar_events(self):
+        self.list_events.clear()
+        
+        # Access Integration Manager through parent chain
+        try:
+            # NotePopup -> SmartNode -> SmartView (via scene?) -> SmartWorkflowOrganizer
+            # Actually SmartNode stores self.mainWindow
+            node = self.parentItem()
+            if not node: return
+            
+            manager = node.main_window.integration_manager
+            calendar_int = manager.get_integration("google_calendar")
+            
+            if not calendar_int or not calendar_int.is_configured():
+                self.list_events.addItem("Google Calendar not configured.")
+                return
+                
+            events = calendar_int.list_upcoming_events()
+            if not events:
+                self.list_events.addItem("No upcoming events.")
+                return
+                
+            for event in events:
+                start = event['start'].get('dateTime', event['start'].get('date'))
+                summary = event.get('summary', '(No Title)')
+                
+                # Format start time string for display (simple slice)
+                if 'T' in start:
+                    display_time = start.split('T')[1][:5] + " " + start.split('T')[0]
+                else:
+                    display_time = start # All day
+                
+                item = QListWidgetItem(f"📅 {display_time} - {summary}")
+                self.list_events.addItem(item)
+                
+        except Exception as e:
+            self.list_events.addItem(f"Error: {str(e)}")
+
+    def open_add_event_dialog(self):
+        node = self.parentItem()
+        if not node: return
+        
+        manager = node.main_window.integration_manager
+        calendar_int = manager.get_integration("google_calendar")
+        
+        if calendar_int:
+            calendar_int.action_create_custom_event(node)
+            self.refresh_calendar_events() # Refresh after creation
+
     def update_content(self, title, type_str, path, notes):
         self.updating = True # Block signal loop
         
@@ -380,7 +505,7 @@ class NotePopup(QGraphicsProxyWidget):
             info_text += f"\nPath: {path}"
         self.lbl_info.setText(info_text)
         
-        self.txt_notes.setPlainText(notes)
+        self.txt_notes.setHtml(notes)
         self.txt_notes.setVisible(True)
 
         # Image Preview
@@ -406,11 +531,29 @@ class NotePopup(QGraphicsProxyWidget):
         if self.updating: return
         # Update parent node notes
         if self.parentItem():
-             self.parentItem().update_notes_from_popup(self.txt_notes.toPlainText())
+             self.parentItem().update_notes_from_popup(self.txt_notes.toHtml())
 
     def _on_open_clicked(self):
         if self.parentItem():
              self.parentItem().open_attachment()
+
+    def toggle_bold(self):
+        fmt = self.txt_notes.currentCharFormat()
+        fmt.setFontWeight(QFont.Weight.Bold if fmt.fontWeight() != QFont.Weight.Bold else QFont.Weight.Normal)
+        self.txt_notes.mergeCurrentCharFormat(fmt)
+        
+    def toggle_italic(self):
+        fmt = self.txt_notes.currentCharFormat()
+        fmt.setFontItalic(not fmt.fontItalic())
+        self.txt_notes.mergeCurrentCharFormat(fmt)
+
+    def pick_color(self):
+        color = QColorDialog.getColor()
+        if color.isValid():
+            fmt = self.txt_notes.currentCharFormat()
+            fmt.setForeground(color)
+            self.txt_notes.mergeCurrentCharFormat(fmt)
+
 
     def hoverEnterEvent(self, event):
         if self.parentItem():
@@ -422,6 +565,8 @@ class NotePopup(QGraphicsProxyWidget):
              self.parentItem().start_hide_timer()
         super().hoverLeaveEvent(event)
         self.hoverLeave.emit()
+
+
 
 # --- 3b. Modern Text Item (No Dashed Outline) ---
 class ModernTextItem(QGraphicsTextItem):
@@ -462,6 +607,9 @@ class SmartNode(QGraphicsRectItem):
         shadow.setColor(QColor(0, 0, 0, 80))
         shadow.setOffset(4, 4)
         self.setGraphicsEffect(shadow)
+
+        self.file_exists = False # Cache for file status
+
 
         # Theme Colors
         theme = self.main_window.theme_data
@@ -519,9 +667,7 @@ class SmartNode(QGraphicsRectItem):
         btn_color = theme["text_dim"] if "text_dim" in theme else "#cccccc"
         self.collapse_btn.setDefaultTextColor(QColor(btn_color))
         self.collapse_btn.setFont(QFont("Arial", 14))
-        self.collapse_btn.setFont(QFont("Arial", 14))
         
-        # Initial sizing
         # Initial sizing
         self.adjust_size()
         
@@ -532,7 +678,7 @@ class SmartNode(QGraphicsRectItem):
         
         self.hide_timer = QTimer()
         self.hide_timer.setSingleShot(True)
-        self.hide_timer.timeout.connect(lambda: self.popup.setVisible(False))
+        self.hide_timer.timeout.connect(self.hide_popup)
         
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():
@@ -668,6 +814,7 @@ class SmartNode(QGraphicsRectItem):
 
         self.popup.setPos(best_pos)
         self.popup.setVisible(True)
+        self.setZValue(100) # Raise on hover
         super().hoverEnterEvent(event)
 
     def hoverLeaveEvent(self, event):
@@ -685,6 +832,10 @@ class SmartNode(QGraphicsRectItem):
 
     def stop_hide_timer(self):
         self.hide_timer.stop()
+
+    def hide_popup(self):
+        self.popup.setVisible(False)
+        self.setZValue(0) # Reset Z-Index
 
     def update_notes_from_popup(self, new_text):
         self.notes = new_text
@@ -801,6 +952,21 @@ class SmartNode(QGraphicsRectItem):
         for name, hex_code in colors.items():
             action = color_menu.addAction(name)
             action.triggered.connect(lambda checked, h=hex_code: self.set_custom_color(h))
+
+        if not self.is_completed:
+            # Integrations Submenu
+            integrations_menu = menu.addMenu("🔌 Integrations")
+            
+            # Google Calendar
+            cal_integration = self.main_window.integration_manager.get_integration("google_calendar")
+            if cal_integration:
+                cal_menu = integrations_menu.addMenu("Google Calendar")
+                
+                # Dynamic Actions from Integration
+                for action_data in cal_integration.get_actions():
+                    action = cal_menu.addAction(action_data["label"])
+                    # Use default argument to capture current loop variable
+                    action.triggered.connect(lambda checked, cb=action_data["callback"]: cb(self))
 
         menu.addSeparator()
 
@@ -1111,7 +1277,7 @@ class SmartNode(QGraphicsRectItem):
         elif self.watch_path:
             if self.attachment_type == "Link":
                 self.setBrush(self.brush_link)
-            elif self.watch_path and os.path.exists(self.watch_path):
+            elif self.file_exists: # Use cached status
                 self.setBrush(self.brush_done)
             else:
                  self.setBrush(self.brush_pending)
@@ -1128,7 +1294,14 @@ class SmartNode(QGraphicsRectItem):
             self.setPen(self.pen_default)
 
         # Update Text
-        display_text = f"{self.attachment_type}: {os.path.basename(self.watch_path)}" if self.watch_path else ""
+        # Update Text
+        display_text = ""
+        if self.watch_path:
+            if self.attachment_type == "Link" and "google.com/calendar/event" in self.watch_path:
+                display_text = "📅 Google Event"
+            else:
+                display_text = f"{self.attachment_type}: {os.path.basename(self.watch_path)}"
+        
         self.type_item.setPlainText(display_text)
         
         # Note Visibility
@@ -1160,21 +1333,13 @@ class SmartNode(QGraphicsRectItem):
 
 # --- 4. The Main Window ---
 class SmartWorkflowOrganizer(QMainWindow):
-    update_available = pyqtSignal(str, str, str) # version, url, notes
 
     def __init__(self):
         super().__init__()
-        
-        # Connect Update Signal
-        self.update_available.connect(self.show_update_notification)
-        
-        # Start Background Check
-        import threading
-        threading.Thread(target=self.run_update_check, daemon=True).start()
 
         # Set Window Icon
         try:
-            icon_path = resource_path("assets/icon.bmp")
+            icon_path = resource_path("assets/icon.png")
             if os.path.exists(icon_path):
                 self.setWindowIcon(QIcon(icon_path))
         except Exception:
@@ -1205,6 +1370,13 @@ class SmartWorkflowOrganizer(QMainWindow):
         from src.themes import ThemeManager
         use_gradient = self.config_manager.is_gradient_enabled()
         self.setStyleSheet(ThemeManager.get_stylesheet(self.config_manager.get_theme(), use_gradient))
+
+        # --- Integrations ---
+        from src.integrations.manager import IntegrationManager
+        from src.integrations.google_calendar import GoogleCalendarIntegration
+        self.integration_manager = IntegrationManager(self)
+        self.integration_manager.register_integration(GoogleCalendarIntegration)
+
 
         # Inline overrides for specific needs if any, utilizing theme variables would be better but stylesheet handles most.
         # However, QGraphicsView bg is handled by stylesheet now in ThemeManager.
@@ -1289,6 +1461,57 @@ class SmartWorkflowOrganizer(QMainWindow):
         self.timer.start(2000) 
         
         self.animate_fade_in()
+
+        # First Run Check
+        QTimer.singleShot(100, self.check_first_run)
+        
+        # Status Checker Thread
+        self.status_checker = StatusChecker()
+        self.status_checker.results_ready.connect(self.apply_status_updates)
+        self.status_checker.start()
+        
+        # Register Crash Callback (specific to this window instance)
+        from src.utils.logger import CrashHandler
+        CrashHandler.register_save_callback(self.emergency_save)
+
+    def emergency_save(self):
+        """Called by CrashHandler."""
+        try:
+            self.save_current_pipeline_to_memory()
+            self.save_to_disk()
+        except:
+            pass
+
+    def check_first_run(self):
+        """Checks if there are no pipelines and prompts for a project name."""
+        if len(self.pipelines_data) <= 1 and not self.pipelines_data.get("Default Project", {}).get("nodes"):
+             # It seems empty, or just default.
+             # Let's check if we just loaded the default empty one.
+             if list(self.pipelines_data.keys()) == ["Default Project"]:
+                 self.prompt_initial_project_name()
+
+    def prompt_initial_project_name(self):
+        name, ok = QInputDialog.getText(self, "Welcome!", "Let's name your first project:")
+        if ok and name:
+            # Rename Default Project
+            self.pipelines_data[name] = self.pipelines_data.pop("Default Project")
+            self.current_pipeline_name = name
+            
+            self.combo_pipelines.blockSignals(True)
+            self.combo_pipelines.clear()
+            self.combo_pipelines.addItem(name)
+            self.combo_pipelines.setCurrentText(name)
+            self.combo_pipelines.blockSignals(False)
+            
+            self.save_to_disk()
+
+    # --- SAVE HELPER ---
+    def trigger_autosave(self):
+        """Autosaves if interval or critical action."""
+        # For now, we save on every structural change as requested by 'unwanted loss' fear, 
+        # but locally (to memory/disk).
+        self.save_current_pipeline_to_memory()
+        self.save_to_disk()
 
     def animate_fade_in(self):
         try:
@@ -1379,6 +1602,10 @@ class SmartWorkflowOrganizer(QMainWindow):
             QMessageBox.warning(self, "Error", f"Could not import 'src.ai.assistant'.\n{e}")
 
     def closeEvent(self, event):
+        # Save Data
+        self.save_current_pipeline_to_memory()
+        self.save_to_disk()
+
         # Save Window State on Close
         if self.normalGeometry().isValid():
              self.config_manager.set_window_geometry(self.saveGeometry().toHex().data().decode())
@@ -1651,8 +1878,15 @@ class SmartWorkflowOrganizer(QMainWindow):
         return node
 
     def add_new_node_center(self):
-        center = self.view.mapToScene(self.view.viewport().rect().center())
-        self.add_node("New Task", center.x() - 100, center.y() - 40)
+        try:
+            center = self.view.mapToScene(self.view.viewport().rect().center())
+            self.add_node("New Task", center.x() - 100, center.y() - 40)
+            self.trigger_autosave()
+        except Exception as e:
+            print(f"Error adding node: {e}")
+            import traceback
+            traceback.print_exc()
+            QMessageBox.warning(self, "Error", f"Could not create node: {e}")
 
     def connect_selected_nodes(self):
         selected_items = self.scene.selectedItems()
@@ -1691,6 +1925,8 @@ class SmartWorkflowOrganizer(QMainWindow):
         
         # Send behind nodes
         line.setZValue(-1) 
+        
+        self.trigger_autosave()
         return line
 
     def delete_node(self, node):
@@ -1702,6 +1938,7 @@ class SmartWorkflowOrganizer(QMainWindow):
         if node in self.nodes:
             self.nodes.remove(node)
         self.update_progress()
+        self.trigger_autosave()
 
     def remove_line(self, line):
         if line in self.lines:
@@ -1712,6 +1949,7 @@ class SmartWorkflowOrganizer(QMainWindow):
             line.start_node.connected_lines.remove(line)
         if line.end_node and line in line.end_node.connected_lines:
             line.end_node.connected_lines.remove(line)
+        self.trigger_autosave()
 
     def delete_selected_items(self):
         selected = self.scene.selectedItems()
@@ -1722,35 +1960,28 @@ class SmartWorkflowOrganizer(QMainWindow):
                 self.delete_node(item)
 
     def update_all_nodes(self):
+        paths = []
         for node in self.nodes:
             node.check_status()
+            if node.watch_path:
+                paths.append(node.watch_path)
+        
+        # Update checker paths
+        if self.status_checker.isRunning():
+            self.status_checker.set_paths(paths)
 
-    def run_update_check(self):
-        try:
-            from src.utils.updater import UpdateManager
-            from src.version import UPDATE_JSON_URL
-            
-            updater = UpdateManager(UPDATE_JSON_URL)
-            has_update, new_ver, url, notes = updater.check_for_updates()
-            
-            if has_update:
-                self.update_available.emit(new_ver, url, notes)
-        except Exception as e:
-            print(f"Update check failed: {e}")
+    def apply_status_updates(self, results):
+        """Update nodes with results from background thread."""
+        for node in self.nodes:
+            if node.watch_path and node.watch_path in results:
+                node.file_exists = results[node.watch_path]
+                node.check_status() # Refresh visual
+    
+    def closeEvent(self, event):
+        self.status_checker.stop()
+        super().closeEvent(event)
 
-    def show_update_notification(self, new_version, url, notes):
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Update Available 🚀")
-        msg.setText(f"A new version of Smart DAG Organizer is available!\n\nVersion: {new_version}\n\n{notes}")
-        msg.setIcon(QMessageBox.Icon.Information)
-        
-        btn_download = msg.addButton("Download Update", QMessageBox.ButtonRole.AcceptRole)
-        msg.addButton("Later", QMessageBox.ButtonRole.RejectRole)
-        
-        msg.exec()
-        
-        if msg.clickedButton() == btn_download:
-            QDesktopServices.openUrl(QUrl(url))
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -4,6 +4,71 @@ import shutil
 import subprocess
 import zipfile
 import sys
+import base64
+import struct
+import os
+
+def generate_ico(filename):
+    print(f"[Icon] Generating icon to {filename} using Pillow...")
+    
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    original_png = os.path.join(base_dir, "assets", "acyclic.PNG")
+
+    try:
+        from PIL import Image
+        if os.path.exists(original_png):
+            img = Image.open(original_png)
+            # Create high-quality multi-size ICO
+            # Include 256x256, 128x128, 64x64, 48x48, 32x32, 16x16
+            # This ensures crisp rendering at all scales and avoids "Single Image" issues.
+            icon_sizes = [(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)]
+            img.save(filename, format='ICO', sizes=icon_sizes)
+            print(f"[Icon] Successfully created multi-size ICO: {filename}")
+            return
+        else:
+            print(f"[Icon] Source image not found: {original_png}")
+
+    except ImportError:
+        print("[Icon] Pillow (PIL) not installed. Please run: pip install Pillow")
+        print("[Icon] Attempting fallback (PowerShell)...")
+        # Native PowerShell Fallback (Single size 64x64)
+        ps_native_script = (
+            f"$path = '{original_png}'; "
+            f"$out = '{filename}'; "
+            "Add-Type -AssemblyName System.Drawing; "
+            "$img = [System.Drawing.Image]::FromFile($path); "
+            "$bmp = new-object System.Drawing.Bitmap($img, 64, 64); "
+            "$hicon = $bmp.GetHicon(); "
+            "$icon = [System.Drawing.Icon]::FromHandle($hicon); " 
+            "$fs = New-Object System.IO.FileStream($out, [System.IO.FileMode]::Create); "
+            "$icon.Save($fs); "
+            "$fs.Close(); "
+            "$icon.Dispose(); $bmp.Dispose(); $img.Dispose(); "
+            "[Runtime.InteropServices.Marshal]::ReleaseComObject($hicon) | Out-Null;"
+        )
+        try:
+             subprocess.check_call(["powershell", "-noprofile", "-command", ps_native_script], 
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+             if os.path.exists(filename) and os.path.getsize(filename) > 100:
+                 print("[Icon] PowerShell fallback successful.")
+                 return
+        except: pass
+
+    except Exception as e:
+        print(f"[Icon] Generation failed: {e}")
+
+    # Ultimate Fallback
+    print(f"[Icon] Using emergency fallback standard icon.")
+    valid_ico_b64 = (
+        "AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAA"
+        "/4DAAN8BAAD/AAAA/wAAAO8AAAD3AAAA5wAAAOcAAAD3AAAA7wAAAP8AAAD/AAAA3wEAAP+AwAD/gMAA/4DAAP+AwAA="
+    )
+    
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    with open(filename, 'wb') as f:
+        f.write(base64.b64decode(valid_ico_b64))
+    print(f"[Icon] Generated fallback {filename}")
+
 
 def run_command(cmd):
     print(f"[Exec] {cmd}")
@@ -13,6 +78,11 @@ def create_installer():
     print("="*60)
     print("   Smart DAG Organizer - Installer Builder")
     print("="*60)
+    
+
+    # Ensure Icon Exists
+    icon_file = "assets/icon.ico"
+    generate_ico(icon_file)
 
     # 0. Sync with Remote
     print("\n[0/5] Syncing with Remote...")
@@ -31,7 +101,41 @@ def create_installer():
     if os.path.exists("build"):
         shutil.rmtree("build")
         
+    # Update main.spec if needed (simple sed-like replace in memory?)
+    # Or just pass --icon to PyInstaller?
+    # main.spec defines the icon. We should update main.spec or rely on PyInstaller overriding it?
+    # PyInstaller's EXE step takes icon.
+    # main.spec has `icon='assets\\icon.ico'` or similar.
+    # checking main.spec content...
+    
+    # Safety Check: Ensure icon exists and matches spec expectation
+    if not os.path.exists(icon_file):
+        print(f"[Error] Generated icon {icon_file} not found! Build will fail.")
+        sys.exit(1)
+        
+    # Update main.spec dynamically to ensure it matches
+    spec_path = "main.spec"
+    if os.path.exists(spec_path):
+        with open(spec_path, "r") as f:
+            spec_content = f.read()
+        
+        # Check for v2 or other legacy names and replace with correct one
+        updated = False
+        if "icon='assets\\\\icon_v2.ico'" in spec_content:
+             print("[Info] Updating main.spec icon path (legacy v2 -> icon.ico)...")
+             spec_content = spec_content.replace("icon='assets\\\\icon_v2.ico'", "icon='assets\\\\icon.ico'")
+             updated = True
+        elif "icon='assets\\icon_v2.ico'" in spec_content:
+             print("[Info] Updating main.spec icon path (legacy v2 -> icon.ico)...")
+             spec_content = spec_content.replace("icon='assets\\icon_v2.ico'", "icon='assets\\icon.ico'")
+             updated = True
+             
+        if updated:
+             with open(spec_path, "w") as f:
+                 f.write(spec_content)
+
     run_command(f'"{sys.executable}" -m PyInstaller main.spec')
+
 
     # 2. Create Payload Zip
     print("\n[2/4] Creating Payload Zip...")
@@ -77,18 +181,54 @@ def create_installer():
         f'--add-data "{payload_zip};." '
     )
     
-    if os.path.exists("assets/icon.ico"):
-        setup_cmd += f' --icon "assets/icon.ico" '
+    # Define icon path
+    icon_abs = os.path.abspath("assets/icon.ico")
+    
+    # Manually generate setup.spec to ensure icon path is correct (string, not list)
+    setup_spec_content = f"""# -*- mode: python ; coding: utf-8 -*-
+
+a = Analysis(
+    ['src\\\\setup_wizard.py'],
+    pathex=[],
+    binaries=[],
+    datas=[('payload.zip', '.')],
+    hiddenimports=[],
+    hookspath=[],
+    hooksconfig={{}},
+    runtime_hooks=[],
+    excludes=[],
+    noarchive=False,
+)
+pyz = PYZ(a.pure)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.datas,
+    [],
+    name='SmartDAG_Installer_Fixed',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=False,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon={repr(icon_abs) if os.path.exists(icon_abs) else 'None'},
+)
+"""
+    with open("setup.spec", "w") as f:
+        f.write(setup_spec_content)
         
-    setup_cmd += f'"src/setup_wizard.py"'
+    print(f"Generated setup.spec with icon: {icon_abs}")
     
-    # We might need to temporarily copy setup_wizard to root to avoid path issues with imports?
-    # Actually, setup_wizard imports PyQt6, which is installed.
-    # It doesn't import src modules? logic is self-contained.
-    # checking setup_wizard.py... it uses standard libs and PyQt6 being installed.
-    # It does NOT import src.* except... wait.
-    
-    run_command(setup_cmd)
+    run_command(f'"{sys.executable}" -m PyInstaller setup.spec')
 
     # 4. Cleanup
     print("\n[4/4] Cleaning up...")
@@ -96,10 +236,10 @@ def create_installer():
         os.remove(payload_zip)
         
     # Move setup to root?
-    setup_exe = "dist/SmartDAG_Setup.exe"
+    setup_exe = "dist/SmartDAG_Installer_Fixed.exe"
     if os.path.exists(setup_exe):
-        shutil.move(setup_exe, "SmartDAG_Setup.exe")
-        print(f"\n[Success] Installer created: SmartDAG_Setup.exe")
+        shutil.move(setup_exe, "SmartDAG_Installer_Fixed.exe")
+        print(f"\n[Success] Installer created: SmartDAG_Installer_Fixed.exe")
     else:
         print("\n[Error] Setup executable not found in dist/")
 

@@ -1,0 +1,117 @@
+257 INFO: PyInstaller: 6.18.0, contrib hooks: 2026.0
+258 INFO: Python: 3.14.0
+302 INFO: Platform: Windows-11-10.0.26200-SP0
+302 INFO: Python environment: C:\Users\kasey_rbdvj6f\Directed Acyclic Graph (DAG)\.venv
+312 INFO: Module search paths (PYTHONPATH):
+['C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)',
+ 'C:\\Users\\kasey_rbdvj6f\\AppData\\Local\\Python\\pythoncore-3.14-64\\python314.zip',
+ 'C:\\Users\\kasey_rbdvj6f\\AppData\\Local\\Python\\pythoncore-3.14-64\\DLLs',
+ 'C:\\Users\\kasey_rbdvj6f\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib',
+ 'C:\\Users\\kasey_rbdvj6f\\AppData\\Local\\Python\\pythoncore-3.14-64',
+ 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv',
+ 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph '
+ '(DAG)\\.venv\\Lib\\site-packages',
+ 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)']
+848 INFO: Appending 'datas' from .spec
+854 INFO: checking Analysis
+854 INFO: Building Analysis because Analysis-00.toc is non existent
+854 INFO: Looking for Python shared library...
+854 INFO: Using Python shared library: C:\Users\kasey_rbdvj6f\AppData\Local\Python\pythoncore-3.14-64\python314.dll
+854 INFO: Running Analysis Analysis-00.toc
+854 INFO: Target bytecode optimization level: 0
+854 INFO: Initializing module dependency graph...
+857 INFO: Initializing module graph hook caches...
+877 INFO: Analyzing modules for base_library.zip ...
+3747 INFO: Processing standard module hook 'hook-encodings.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+4518 INFO: Processing standard module hook 'hook-pickle.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+4879 INFO: Processing standard module hook 'hook-difflib.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+4927 INFO: Processing standard module hook 'hook-heapq.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+8488 INFO: Caching module dependency graph...
+8527 INFO: Analyzing C:\Users\kasey_rbdvj6f\Directed Acyclic Graph (DAG)\main.py
+8583 INFO: Processing standard module hook 'hook-_ctypes.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+8592 INFO: Processing standard module hook 'hook-PyQt6.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+10183 INFO: Processing standard module hook 'hook-PyQt6.QtWidgets.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+13424 INFO: Processing standard module hook 'hook-PyQt6.QtCore.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+18032 INFO: Processing standard module hook 'hook-PyQt6.QtGui.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+33472 INFO: Processing standard module hook 'hook-platform.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+33834 INFO: Processing standard module hook 'hook-multiprocessing.util.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+34026 INFO: Processing standard module hook 'hook-xml.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+35073 INFO: Processing standard module hook 'hook-cryptography.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+36849 INFO: hook-cryptography: cryptography does not seem to be using dynamically linked OpenSSL.
+38366 INFO: Processing standard module hook 'hook-sysconfig.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+38987 INFO: Processing standard module hook 'hook-urllib3.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+39137 INFO: Processing pre-safe-import-module hook 'hook-backports.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+39141 INFO: SetuptoolsInfo: initializing cached setuptools info...
+40079 INFO: Setuptools: 'backports' appears to be a full setuptools-vendored copy - creating alias to 'setuptools._vendor.backports'!
+40089 INFO: Processing standard module hook 'hook-setuptools.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+40114 INFO: Processing pre-safe-import-module hook 'hook-distutils.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+40164 INFO: Processing pre-safe-import-module hook 'hook-jaraco.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+40166 INFO: Setuptools: 'jaraco' appears to be a partial setuptools-vendored copy - extending search paths to ['C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\jaraco', 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\setuptools\\_vendor\\jaraco']!
+40167 INFO: Processing pre-safe-import-module hook 'hook-jaraco.functools.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+40184 INFO: Processing pre-safe-import-module hook 'hook-more_itertools.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+40374 INFO: Processing pre-safe-import-module hook 'hook-typing_extensions.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+40502 INFO: Processing pre-safe-import-module hook 'hook-packaging.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+40771 INFO: Processing pre-safe-import-module hook 'hook-jaraco.text.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+40772 INFO: Setuptools: 'jaraco.text' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.jaraco.text'!
+40789 INFO: Processing standard module hook 'hook-setuptools._vendor.jaraco.text.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+40791 INFO: Processing pre-safe-import-module hook 'hook-importlib_resources.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+40795 INFO: Processing pre-safe-import-module hook 'hook-jaraco.context.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+41062 INFO: Processing pre-safe-import-module hook 'hook-importlib_metadata.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+41063 INFO: Setuptools: 'importlib_metadata' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.importlib_metadata'!
+41110 INFO: Processing standard module hook 'hook-setuptools._vendor.importlib_metadata.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+41152 INFO: Processing pre-safe-import-module hook 'hook-zipp.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+41153 INFO: Setuptools: 'zipp' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.zipp'!
+41542 INFO: Processing pre-safe-import-module hook 'hook-tomli.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+41544 INFO: Setuptools: 'tomli' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.tomli'!
+42326 INFO: Processing pre-safe-import-module hook 'hook-wheel.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+42328 INFO: Setuptools: 'wheel' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.wheel'!
+43124 INFO: Processing standard module hook 'hook-charset_normalizer.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+43364 INFO: Processing standard module hook 'hook-certifi.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+43748 INFO: Processing standard module hook 'hook-pycparser.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+45834 INFO: Processing standard module hook 'hook-google.api_core.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+45941 INFO: Processing standard module hook 'hook-httplib2.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+46603 INFO: Processing standard module hook 'hook-googleapiclient.model.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+47252 INFO: Processing module hooks (post-graph stage)...
+47254 WARNING: Hidden import "pycparser.lextab" not found!
+47254 WARNING: Hidden import "pycparser.yacctab" not found!
+47410 INFO: Performing binary vs. data reclassification (767 entries)
+47590 INFO: Looking for ctypes DLLs
+47665 INFO: Analyzing run-time hooks ...
+47670 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+47674 INFO: Including run-time hook 'pyi_rth_pyqt6.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+47678 INFO: Processing pre-find-module-path hook 'hook-_pyi_rth_utils.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+47682 INFO: Processing standard module hook 'hook-_pyi_rth_utils.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+47688 INFO: Including run-time hook 'pyi_rth_pkgutil.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+47692 INFO: Including run-time hook 'pyi_rth_cryptography_openssl.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\rthooks'
+47693 INFO: Including run-time hook 'pyi_rth_setuptools.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+47695 INFO: Including run-time hook 'pyi_rth_multiprocessing.py' from 'C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+47730 INFO: Creating base_library.zip...
+47759 INFO: Looking for dynamic libraries
+49800 INFO: Extra DLL search directories (AddDllDirectory): ['C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyQt6\\Qt6\\bin']
+49800 INFO: Extra DLL search directories (PATH): ['C:\\Users\\kasey_rbdvj6f\\Directed Acyclic Graph (DAG)\\.venv\\Lib\\site-packages\\PyQt6\\Qt6\\bin']
+50844 INFO: Warnings written to C:\Users\kasey_rbdvj6f\Directed Acyclic Graph (DAG)\build\main\warn-main.txt
+50933 INFO: Graph cross-reference written to C:\Users\kasey_rbdvj6f\Directed Acyclic Graph (DAG)\build\main\xref-main.html
+51001 INFO: checking PYZ
+51001 INFO: Building PYZ because PYZ-00.toc is non existent
+51001 INFO: Building PYZ (ZlibArchive) C:\Users\kasey_rbdvj6f\Directed Acyclic Graph (DAG)\build\main\PYZ-00.pyz
+51526 INFO: Building PYZ (ZlibArchive) C:\Users\kasey_rbdvj6f\Directed Acyclic Graph (DAG)\build\main\PYZ-00.pyz completed successfully.
+51557 INFO: checking PKG
+51557 INFO: Building PKG because PKG-00.toc is non existent
+51557 INFO: Building PKG (CArchive) SmartDAGOrganizer.pkg
+51599 INFO: Building PKG (CArchive) SmartDAGOrganizer.pkg completed successfully.
+51602 INFO: Bootloader C:\Users\kasey_rbdvj6f\Directed Acyclic Graph (DAG)\.venv\Lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\runw_d.exe
+51602 INFO: checking EXE
+51603 INFO: Building EXE because EXE-00.toc is non existent
+51603 INFO: Building EXE from EXE-00.toc
+51603 INFO: Copying bootloader EXE to C:\Users\kasey_rbdvj6f\Directed Acyclic Graph (DAG)\build\main\SmartDAGOrganizer.exe
+51676 INFO: Copying icon to EXE
+51734 INFO: Copying 0 resources to EXE
+51734 INFO: Embedding manifest in EXE
+51801 INFO: Appending PKG archive to EXE
+51893 INFO: Fixing EXE headers
+52207 INFO: Building EXE from EXE-00.toc completed successfully.
+52215 INFO: checking COLLECT
+52215 INFO: Building COLLECT because COLLECT-00.toc is non existent
+52216 INFO: Building COLLECT COLLECT-00.toc
+53961 INFO: Building COLLECT COLLECT-00.toc completed successfully.
+53987 INFO: Build complete! The results are available in: C:\Users\kasey_rbdvj6f\Directed Acyclic Graph (DAG)\dist
