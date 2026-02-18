@@ -6,7 +6,7 @@ import zipfile
 import sys
 import base64
 import struct
-import os
+import json
 
 def generate_ico(filename):
     print(f"[Icon] Generating icon to {filename} using Pillow...")
@@ -74,18 +74,59 @@ def run_command(cmd):
     print(f"[Exec] {cmd}")
     subprocess.check_call(cmd, shell=True)
 
+def update_version():
+    """Prompts for version update and updates files."""
+    print("\n[0/5] Version Check...")
+    current_ver = "1.0.0"
+    if os.path.exists("version.json"):
+        with open("version.json", "r") as f:
+            data = json.load(f)
+            current_ver = data.get("version", "1.0.0")
+    
+    print(f"Current Version: {current_ver}")
+    new_ver = input(f"Enter new version (or press Enter to keep {current_ver}): ").strip()
+    
+    if new_ver:
+        # Update version.json
+        if os.path.exists("version.json"):
+            with open("version.json", "r") as f:
+                data = json.load(f)
+            data["version"] = new_ver
+            with open("version.json", "w") as f:
+                json.dump(data, f, indent=4)
+            print(f"Updated version.json to {new_ver}")
+
+        # Update src/version.py
+        ver_py_path = "src/version.py"
+        if os.path.exists(ver_py_path):
+            with open(ver_py_path, "r") as f:
+                lines = f.readlines()
+            with open(ver_py_path, "w") as f:
+                for line in lines:
+                    if line.startswith("APP_VERSION ="):
+                        f.write(f'APP_VERSION = "{new_ver}"\n')
+                    else:
+                        f.write(line)
+            print(f"Updated src/version.py to {new_ver}")
+        return new_ver
+    return current_ver
+
 def create_installer():
     print("="*60)
     print("   Smart DAG Organizer - Installer Builder")
     print("="*60)
     
+    # 0. Version Update (BEFORE Build)
+    version = update_version()
 
     # Ensure Icon Exists
     icon_file = "assets/icon.ico"
     generate_ico(icon_file)
 
-    # 0. Sync with Remote
-    print("\n[0/5] Syncing with Remote...")
+    # 1. Sync with Remote (Optional, ask user?)
+    # For now, let's just pull to ensure we are up to date, but be careful not to overwrite local changes if dirty?
+    # User said "The current create_installer.py flow is good", so let's keep the pull.
+    print("\n[1/5] Syncing with Remote...")
     try:
         run_command("git pull origin master")
     except Exception as e:
@@ -94,20 +135,13 @@ def create_installer():
         if response != 'y':
             sys.exit(1)
 
-    # 1. Build Main Application
-    print("\n[1/4] Building Main Application...")
+    # 2. Build Main Application
+    print("\n[2/5] Building Main Application...")
     if os.path.exists("dist"):
         shutil.rmtree("dist")
     if os.path.exists("build"):
         shutil.rmtree("build")
         
-    # Update main.spec if needed (simple sed-like replace in memory?)
-    # Or just pass --icon to PyInstaller?
-    # main.spec defines the icon. We should update main.spec or rely on PyInstaller overriding it?
-    # PyInstaller's EXE step takes icon.
-    # main.spec has `icon='assets\\icon.ico'` or similar.
-    # checking main.spec content...
-    
     # Safety Check: Ensure icon exists and matches spec expectation
     if not os.path.exists(icon_file):
         print(f"[Error] Generated icon {icon_file} not found! Build will fail.")
@@ -137,8 +171,8 @@ def create_installer():
     run_command(f'"{sys.executable}" -m PyInstaller main.spec')
 
 
-    # 2. Create Payload Zip
-    print("\n[2/4] Creating Payload Zip...")
+    # 3. Create Payload Zip
+    print("\n[3/5] Creating Payload Zip...")
     payload_zip = "payload.zip"
     dist_dir = "dist/SmartDAGOrganizer"
     
@@ -153,7 +187,6 @@ def create_installer():
                 zipf.write(file_path, arcname)
                 
     # Add Data/Config if they exist in root but not in dist (depending on main.spec)
-    # main.spec should have added them, but let's be safe for user data templates
     if os.path.exists("data"):
         with zipfile.ZipFile(payload_zip, 'a', zipfile.ZIP_DEFLATED) as zipf:
              for root, dirs, files in os.walk("data"):
@@ -167,19 +200,8 @@ def create_installer():
 
     print(f"Payload created: {os.path.abspath(payload_zip)}")
 
-    # 3. Build Setup Executable
-    print("\n[3/4] Building Setup Wizard...")
-    
-    # PyInstaller command for the installer
-    # --onefile: Single exe
-    # --windowed: No console
-    # --add-data: Embed the zip
-    # --icon: Icon for the setup exe
-    
-    setup_cmd = (
-        f'"{sys.executable}" -m PyInstaller --noconfirm --onefile --windowed --name "SmartDAG_Setup" '
-        f'--add-data "{payload_zip};." '
-    )
+    # 4. Build Setup Executable
+    print("\n[4/5] Building Setup Wizard...")
     
     # Define icon path
     icon_abs = os.path.abspath("assets/icon.ico")
@@ -230,8 +252,7 @@ exe = EXE(
     
     run_command(f'"{sys.executable}" -m PyInstaller setup.spec')
 
-    # 4. Cleanup
-    print("\n[4/4] Cleaning up...")
+    # Cleanup
     if os.path.exists(payload_zip):
         os.remove(payload_zip)
         
@@ -253,44 +274,10 @@ exe = EXE(
     
     if do_release == 'y':
         try:
-            # Check if version should be bumped
-            import json
-            current_ver = "1.0.0"
-            if os.path.exists("version.json"):
-                with open("version.json", "r") as f:
-                    data = json.load(f)
-                    current_ver = data.get("version", "1.0.0")
-            
-            print(f"Current Version: {current_ver}")
-            new_ver = input(f"Enter new version (or press Enter to keep {current_ver}): ").strip()
-            
-            if new_ver:
-                # Update version.json
-                if os.path.exists("version.json"):
-                    with open("version.json", "r") as f:
-                        data = json.load(f)
-                    data["version"] = new_ver
-                    with open("version.json", "w") as f:
-                        json.dump(data, f, indent=4)
-                    print(f"Updated version.json to {new_ver}")
-
-                # Update src/version.py
-                ver_py_path = "src/version.py"
-                if os.path.exists(ver_py_path):
-                    with open(ver_py_path, "r") as f:
-                        lines = f.readlines()
-                    with open(ver_py_path, "w") as f:
-                        for line in lines:
-                            if line.startswith("APP_VERSION ="):
-                                f.write(f'APP_VERSION = "{new_ver}"\n')
-                            else:
-                                f.write(line)
-                    print(f"Updated src/version.py to {new_ver}")
-            
             # Git Commands
             commit_msg = input("Enter commit message (default: 'Update: New Release'): ").strip()
             if not commit_msg:
-                commit_msg = f"Release {new_ver}"
+                commit_msg = f"Release {version}"
                 
             print("Pushing to GitHub...")
             run_command("git add .")
@@ -317,7 +304,7 @@ exe = EXE(
                         sys.exit(1)
             
             # Push Tag to trigger GitHub Action
-            tag_name = f"v{new_ver}"
+            tag_name = f"v{version}"
             print(f"Pushing tag {tag_name} to trigger release build...")
             
             # Use -f to overwrite if it exists locally, and force push to remote
